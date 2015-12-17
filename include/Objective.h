@@ -10,7 +10,7 @@
 #define __LHAC_v1__Objective__
 
 
-template <typename Derived>
+template <typename Derived, typename T1>
 class Objective
 {
 public:
@@ -18,11 +18,11 @@ public:
         return static_cast<Derived*>(this)->getDims();
     };
 
-    inline double computeObject(double* wnew) {
+    inline T1 computeObject(T1* wnew) {
         return static_cast<Derived*>(this)->computeObject(wnew);
     };
 
-    inline void computeGradient(double* wnew, double* df) {
+    inline void computeGradient(T1* wnew, T1* df) {
         static_cast<Derived*>(this)->computeGradient(wnew, df);
     };
 

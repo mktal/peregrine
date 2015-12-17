@@ -1,7 +1,7 @@
 /*
 * @Date:   2015-12-15 17:02:23
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-15 17:07:43
+* @Last Modified time: 2015-12-16 23:52:21
 *
 * Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 * All rights reserved.
@@ -60,4 +60,6 @@ void _init_array(py::module &m, const char* name) {
 
 void init_array(py::module &m) {
     _init_array<double>(m, "Array");
+    _init_array<double>(m, "Array64");
+    _init_array<float>(m, "Array32");
 }

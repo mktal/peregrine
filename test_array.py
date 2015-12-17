@@ -1,8 +1,7 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python -*- coding: utf-8 -*-
 # @Date:   2015-12-15 15:23:56
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-16 00:35:20
+# @Last Modified time: 2015-12-17 00:25:54
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -77,9 +76,8 @@ class LogReg(object):
         else:
             e_ywx = np.exp(self.Y*np.dot(self.X, w))
         a = -self.Y/(1+e_ywx)/self.n
-        np.dot(a, self.X, out=df)
-        return
-
+        # np.dot(a, self.X, out=df)
+        np.copyto(df, np.dot(a, self.X))
 
 
 @unittest.skip('.')
@@ -154,7 +152,7 @@ class TrainTestCase(unittest.TestCase):
         from example import test_objective
         test_objective(f, g, 3)
 
-    # @unittest.skip('.')
+    @unittest.skip('.')
     def test_LogReg(self):
         data, target = load_digits()
         prob = LogReg(data, target)
@@ -169,7 +167,7 @@ class TrainTestCase(unittest.TestCase):
         data, target = load_mnist()
         prob = LogReg(data, target, cached=True)
         f, g = prob.eval_obj, prob.eval_grad
-        train(f, g, prob.shape[1])
+        train(f, g, prob.shape[1], verbose=1)
 
 
 

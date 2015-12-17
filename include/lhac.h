@@ -44,29 +44,30 @@ struct Func {
     };
 };
 
+template <typename T1>
 struct Solution {
-    double* t;
-    double* fval;
-    double* normgs;
+    T1* t;
+    T1* fval;
+    T1* normgs;
     int* niter;
     unsigned long* numActive;
 
-    double* w;
+    T1* w;
     unsigned long p; //dimension of w
 
-    double cdTime;
-    double lsTime;
-    double lbfgsTime1;
-    double lbfgsTime2;
+    T1 cdTime;
+    T1 lsTime;
+    T1 lbfgsTime1;
+    T1 lbfgsTime2;
     unsigned long size; // max_newton_iter
 
     unsigned long ngval;
     unsigned long nfval;
     unsigned long nls; // # of line searches
-    double gvalTime;
-    double fvalTime;
+    T1 gvalTime;
+    T1 fvalTime;
 
-    inline void addEntry(double objval, double normsg, double elapsedTime,
+    inline void addEntry(T1 objval, T1 normsg, T1 elapsedTime,
                          int iter, unsigned long _numActive) {
         fval[size] = objval;
         normgs[size] = normsg;
@@ -76,8 +77,8 @@ struct Solution {
         (size)++;
     };
 
-    inline void finalReport(const int error, double* wfinal) {
-        memcpy(w, wfinal, p*sizeof(double));
+    inline void finalReport(const int error, T1* wfinal) {
+        memcpy(w, wfinal, p*sizeof(T1));
         unsigned long last = size - 1;
         printf(
                "=========================== final report ========================\n"
@@ -96,9 +97,9 @@ struct Solution {
     };
 
     Solution(unsigned long max_iter, unsigned long _p) {
-        fval = new double[max_iter];
-        normgs = new double[max_iter];
-        t = new double[max_iter];
+        fval = new T1[max_iter];
+        normgs = new T1[max_iter];
+        t = new T1[max_iter];
         niter = new int[max_iter];
         numActive = new unsigned long[max_iter];
         cdTime = 0;
@@ -112,7 +113,7 @@ struct Solution {
         nls = 0;
         size = 0;
         p = _p;
-        w = new double[p];
+        w = new T1[p];
     };
 
     ~Solution() {
@@ -128,22 +129,22 @@ struct Solution {
 
 
 
-template <typename InnerSolver>
+template <typename InnerSolver, typename T1>
 class Subproblem
 {
 public:
-    inline void build(LBFGS* lR, double* grad,
+    inline void build(LBFGS<T1>* lR, T1* grad,
                       work_set_struct* work_set) {
         return static_cast<InnerSolver*>(this)->build(lR, grad, work_set);
     };
 
-    inline double objective_value(const double gama) {
+    inline T1 objective_value(const T1 gama) {
         return static_cast<InnerSolver*>(this)->objective_value(gama);
     };
 
-    inline const double* solve(const double* w_prev,
+    inline const T1* solve(const T1* w_prev,
                                const unsigned short k,
-                               double gama) {
+                               T1 gama) {
         return static_cast<InnerSolver*>(this)->solve(w_prev, k, gama);
     };
 
@@ -151,7 +152,8 @@ public:
 
 };
 
-class CoordinateDescent: public Subproblem<CoordinateDescent>
+template <typename T1>
+class CoordinateDescent: public Subproblem<CoordinateDescent<T1>, T1>
 {
 public:
     CoordinateDescent(const Parameter* const _param, unsigned long _p): p(_p) {
@@ -159,9 +161,9 @@ public:
         l = _param->l;
         cd_rate = _param->cd_rate;
         msgFlag = _param->verbose;
-        D = new double[p];
-        H_diag = new double[p]; // p
-        d_bar = new double[2*l]; // 2*l
+        D = new T1[p];
+        H_diag = new T1[p]; // p
+        d_bar = new T1[2*l]; // 2*l
     };
 
     ~CoordinateDescent() {
@@ -171,7 +173,7 @@ public:
     };
 
 
-    void build(LBFGS* lR, double* grad,
+    void build(LBFGS<T1>* lR, T1* grad,
                work_set_struct* work_set) {
         Q = lR->Q;
         Q_bar = lR->Q_bar;
@@ -182,8 +184,8 @@ public:
         numActive = work_set->numActive;
         gama0 = lR->gama;
         buffer = lR->buff;
-        memset(D, 0, p*sizeof(double));
-        memset(d_bar, 0, 2*l*sizeof(double));
+        memset(D, 0, p*sizeof(T1));
+        memset(d_bar, 0, 2*l*sizeof(T1));
         for (unsigned long k = 0, i = 0; i < work_set->numActive; i++, k += m) {
             H_diag[i] = gama0;
             for (unsigned long j = 0; j < m; j++)
@@ -191,13 +193,13 @@ public:
         }
     };
 
-    double objective_value(const double gama) {
-        double order1 = lcddot((int)p, D, 1, L_grad, 1);
-        double order2 = 0;
+    T1 objective_value(const T1 gama) {
+        T1 order1 = lcddot((int)p, D, 1, L_grad, 1);
+        T1 order2 = 0;
         int cblas_M = (int) numActive;
         int cblas_N = (int) m;
         lcdgemv(CblasColMajor, CblasTrans, Q, d_bar, buffer, cblas_N, cblas_M, cblas_N);
-        double vp = 0;
+        T1 vp = 0;
         for (unsigned long ii = 0; ii < numActive; ii++) {
             unsigned long idx = idxs[ii].j;
             unsigned long idx_Q = permut[ii];
@@ -208,28 +210,28 @@ public:
         return order1 + order2;
     }
 
-    const double* solve(const double* w_prev,
+    const T1* solve(const T1* w_prev,
                         const unsigned short k,
-                        double gama) {
-        double dH_diag = gama-gama0;
+                        T1 gama) {
+        T1 dH_diag = gama-gama0;
         unsigned long max_cd_pass = 1 + k / cd_rate;
         for (unsigned long cd_pass = 1; cd_pass <= max_cd_pass; cd_pass++) {
-            double diffd = 0;
-            double normd = 0;
+            T1 diffd = 0;
+            T1 normd = 0;
             for (unsigned long ii = 0; ii < numActive; ii++) {
                 unsigned long rii = ii;
                 unsigned long idx = idxs[rii].j;
                 unsigned long idx_Q = permut[rii];
                 unsigned long Q_idx_m = idx_Q*m;
-                double Qd_bar = lcddot(m, &Q[Q_idx_m], 1, d_bar, 1);
-                double Hd_j = gama*D[idx] - Qd_bar;
-                double Hii = H_diag[idx_Q] + dH_diag;
-                double G = Hd_j + L_grad[idx];
-                double Gp = G + lmd;
-                double Gn = G - lmd;
-                double wpd = w_prev[idx] + D[idx];
-                double Hwd = Hii * wpd;
-                double z = -wpd;
+                T1 Qd_bar = lcddot(m, &Q[Q_idx_m], 1, d_bar, 1);
+                T1 Hd_j = gama*D[idx] - Qd_bar;
+                T1 Hii = H_diag[idx_Q] + dH_diag;
+                T1 G = Hd_j + L_grad[idx];
+                T1 Gp = G + lmd;
+                T1 Gn = G - lmd;
+                T1 wpd = w_prev[idx] + D[idx];
+                T1 Hwd = Hii * wpd;
+                T1 z = -wpd;
                 if (Gp <= Hwd) z = -Gp/Hii;
                 if (Gn >= Hwd) z = -Gn/Hii;
                 D[idx] = D[idx] + z;
@@ -248,18 +250,18 @@ public:
 
 private:
     /* own */
-    double* D;
-    double* d_bar;
-    double* H_diag;
+    T1* D;
+    T1* d_bar;
+    T1* H_diag;
 
-    double* Q;
-    double* Q_bar;
-    double* L_grad;
-    double* buffer;
+    T1* Q;
+    T1* Q_bar;
+    T1* L_grad;
+    T1* buffer;
     unsigned long* permut;
     ushort_pair_t* idxs;
-    double lmd;
-    double gama0;
+    T1 lmd;
+    T1 gama0;
     unsigned long cd_rate;
     unsigned long l;
     unsigned long numActive;
@@ -270,12 +272,12 @@ private:
 };
 
 
-template <typename Derived>
+template <typename Derived, typename T1>
 class LHAC
 {
 public:
 
-    LHAC(Objective<Derived>* _mdl, const Parameter* const _param)
+    LHAC(Objective<Derived, T1>* _mdl, const Parameter* const _param)
     : mdl(_mdl), param(_param) {
         p = mdl->getDims();
         obj = new Func;
@@ -286,22 +288,22 @@ public:
         lmd = param->lmd;
         msgFlag = param->verbose;
 
-        w_prev = new double[p];
-        w = new double[p];
-        L_grad_prev = new double[p];
-        L_grad = new double[p];
-        D = new double[p];
-        H_diag = new double[p]; // p
-        d_bar = new double[2*param->l]; // 2*l
+        w_prev = new T1[p];
+        w = new T1[p];
+        L_grad_prev = new T1[p];
+        L_grad = new T1[p];
+        D = new T1[p];
+        H_diag = new T1[p]; // p
+        d_bar = new T1[2*param->l]; // 2*l
 
         /* initiate */
-        memset(w, 0, p*sizeof(double));
-        memset(w_prev, 0, p*sizeof(double));
-        memset(D, 0, p*sizeof(double));
+        memset(w, 0, p*sizeof(T1));
+        memset(w_prev, 0, p*sizeof(T1));
+        memset(D, 0, p*sizeof(T1));
 
-        sols = new Solution(max_iter, p);
+        sols = new Solution<T1>(max_iter, p);
         work_set = new work_set_struct(p);
-        lR = new LBFGS(p, l, param->shrink);
+        lR = new LBFGS<T1>(p, l, (T1) param->shrink);
 
         ista_size = 1;
 
@@ -321,7 +323,7 @@ public:
     }
 
     int ista() {
-        double elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
+        T1 elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
         int error = 0;
         normsg = normsg0;
         for (ista_iter = 1; ista_iter <= max_iter; ista_iter++) {
@@ -329,7 +331,7 @@ public:
             if (error) {
                 break;
             }
-            double elapsedTime = CFAbsoluteTimeGetCurrent()-elapsedTimeBegin;
+            T1 elapsedTime = CFAbsoluteTimeGetCurrent()-elapsedTimeBegin;
             if (ista_iter == 1 || ista_iter % 30 == 0 )
                 sols->addEntry(obj->val, normsg, elapsedTime, ista_iter, work_set->numActive);
             if (msgFlag >= LHAC_MSG_NEWTON)
@@ -346,13 +348,13 @@ public:
 
     // proximal inexact quasi-newton
     int piqn() {
-        double elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
+        T1 elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
         initialStep();
         int error = 0;
         for (newton_iter = 1; newton_iter < max_iter; newton_iter++) {
             computeWorkSet();
             lR->computeLowRankApprox_v2(work_set);
-            double elapsedTime = CFAbsoluteTimeGetCurrent()-elapsedTimeBegin;
+            T1 elapsedTime = CFAbsoluteTimeGetCurrent()-elapsedTimeBegin;
             normsg = computeSubgradient();
             if (msgFlag >= LHAC_MSG_NEWTON)
                 printf("%.4e  iter %3d:   obj.f = %+.4e    obj.normsg = %+.4e   |work_set| = %ld\n",
@@ -365,7 +367,7 @@ public:
             if (error) {
                 break;
             }
-            memcpy(L_grad_prev, L_grad, p*sizeof(double));
+            memcpy(L_grad_prev, L_grad, p*sizeof(T1));
             mdl->computeGradient(w, L_grad);
             /* update LBFGS */
             lR->updateLBFGS(w, w_prev, L_grad, L_grad_prev);
@@ -374,7 +376,7 @@ public:
     }
 
     template <typename InnerSolver>
-    int piqnGeneral(Subproblem<InnerSolver>* subprob) {
+    int piqnGeneral(Subproblem<InnerSolver, T1>* subprob) {
         double elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
         initialStep();
         int error = 0;
@@ -394,12 +396,12 @@ public:
 
             /* inner solver starts*/
             subprob->build(lR, L_grad, work_set);
-            double gama = lR->gama;
-            double rho_trial = 0.0;
-            memcpy(w_prev, w, p*sizeof(double));
+            T1 gama = lR->gama;
+            T1 rho_trial = 0.0;
+            memcpy(w_prev, w, p*sizeof(T1));
             unsigned short inner_iter;
             for (inner_iter = 0; inner_iter < max_inner_iter; inner_iter++) {
-                const double* d = subprob->solve(w_prev, newton_iter, gama);
+                const T1* d = subprob->solve(w_prev, newton_iter, gama);
                 bool good_d = sufficientDecreaseCheck(d, subprob, gama, &rho_trial);
                 if (good_d) {
                     if (msgFlag >= LHAC_MSG_SD)
@@ -416,7 +418,7 @@ public:
                 break;
             }
 
-            memcpy(L_grad_prev, L_grad, p*sizeof(double));
+            memcpy(L_grad_prev, L_grad, p*sizeof(T1));
             mdl->computeGradient(w, L_grad);
             /* update LBFGS */
             lR->updateLBFGS(w, w_prev, L_grad, L_grad_prev);
@@ -426,16 +428,16 @@ public:
 
     /* fast proximal inexact quasi-newton */
     int fpiqn() {
-        double elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
+        T1 elapsedTimeBegin = CFAbsoluteTimeGetCurrent();
         initialStep();
-        double t = 1.0;
+        T1 t = 1.0;
         int error = 0;
-        double* x = new double[p];
-        memcpy(x, w, p*sizeof(double)); // w_1 (y_1) == x_0
+        T1* x = new T1[p];
+        memcpy(x, w, p*sizeof(T1)); // w_1 (y_1) == x_0
         for (newton_iter = 1; newton_iter < max_iter; newton_iter++) {
             computeWorkSet();
             lR->computeLowRankApprox_v2(work_set);
-            double elapsedTime = CFAbsoluteTimeGetCurrent()-elapsedTimeBegin;
+            T1 elapsedTime = CFAbsoluteTimeGetCurrent()-elapsedTimeBegin;
             normsg = computeSubgradient();
             if (msgFlag >= LHAC_MSG_NEWTON)
                 printf("%.4e  iter %3d:   obj.f = %+.4e    obj.normsg = %+.4e   |work_set| = %ld\n",
@@ -450,7 +452,7 @@ public:
             }
             fistaUpdate(&t, x);
             obj->add(mdl->computeObject(w), computeReg(w));
-            memcpy(L_grad_prev, L_grad, p*sizeof(double));
+            memcpy(L_grad_prev, L_grad, p*sizeof(T1));
             mdl->computeGradient(w, L_grad);
             /* update LBFGS */
             lR->updateLBFGS(w, w_prev, L_grad, L_grad_prev);
@@ -458,7 +460,7 @@ public:
         return error;
     }
 
-    Solution* solve()
+    Solution<T1>* solve()
     {
         obj->add(mdl->computeObject(w), computeReg(w));
         mdl->computeGradient(w, L_grad);
@@ -479,7 +481,7 @@ public:
                 break;
 
             case 4:
-                error = piqnGeneral(new CoordinateDescent(param, p));
+                error = piqnGeneral(new CoordinateDescent<T1>(param, p));
                 break;
 
             default:
@@ -493,42 +495,42 @@ public:
     };
 
 private:
-    Objective<Derived>* mdl;
+    Objective<Derived, T1>* mdl;
     const Parameter* param;
-    Solution* sols;
+    Solution<T1>* sols;
     work_set_struct* work_set;
     Func* obj;
-    LBFGS* lR;
+    LBFGS<T1>* lR;
 
     unsigned long l;
-    double opt_outer_tol;
+    T1 opt_outer_tol;
     unsigned short max_iter;
-    double lmd;
+    T1 lmd;
     int msgFlag;
 
     unsigned long p;
     unsigned short newton_iter;
     unsigned short ista_iter;
-    double ista_size;
+    T1 ista_size;
 
-    double* D;
-    double normsg0;
-    double normsg;
-    double* w_prev;
-    double* w;
-    double* L_grad_prev;
-    double* L_grad;
-    double* H_diag; // p
-    double* d_bar; // 2*l
+    T1* D;
+    T1 normsg0;
+    T1 normsg;
+    T1* w_prev;
+    T1* w;
+    T1* L_grad_prev;
+    T1* L_grad;
+    T1* H_diag; // p
+    T1* d_bar; // 2*l
 
 
     void initialStep() {
         // initial step (only for l1)
         for (unsigned long idx = 0; idx < p; idx++) {
-            double G = L_grad[idx];
-            double Gp = G + lmd;
-            double Gn = G - lmd;
-            double Hwd = 0.0;
+            T1 G = L_grad[idx];
+            T1 Gp = G + lmd;
+            T1 Gn = G - lmd;
+            T1 Hwd = 0.0;
             if (Gp <= Hwd)
                 D[idx] = -Gp;
             else if (Gn >= Hwd)
@@ -536,9 +538,9 @@ private:
             else
                 D[idx] = 0.0;
         }
-        double a = 1.0;
-        double l1_next = 0.0;
-        double delta = 0.0;
+        T1 a = 1.0;
+        T1 l1_next = 0.0;
+        T1 delta = 0.0;
         for (unsigned long i = 0; i < p; i++) {
             w[i] += D[i];
             l1_next += lmd*fabs(w[i]);
@@ -547,8 +549,8 @@ private:
         delta += l1_next - obj->g;
         // line search
         for (unsigned long lineiter = 0; lineiter < 1000; lineiter++) {
-            double f_trial = mdl->computeObject(w);
-            double obj_trial = f_trial + l1_next;
+            T1 f_trial = mdl->computeObject(w);
+            T1 obj_trial = f_trial + l1_next;
             if (obj_trial < obj->val + a*0.001*delta) {
                 obj->add(f_trial, l1_next);
                 break;
@@ -560,19 +562,19 @@ private:
                 l1_next += lmd*fabs(w[i]);
             }
         }
-        memcpy(L_grad_prev, L_grad, p*sizeof(double));
+        memcpy(L_grad_prev, L_grad, p*sizeof(T1));
         mdl->computeGradient(w, L_grad);
         lR->initData(w, w_prev, L_grad, L_grad_prev);
     }
 
     int istaStep() {
-        memcpy(w_prev, w, p*sizeof(double));
+        memcpy(w_prev, w, p*sizeof(T1));
         for (int backtrack=0; backtrack<200; backtrack++) {
-            double t = ista_size*lmd;
+            T1 t = ista_size*lmd;
             unsigned long i;
 #pragma omp parallel for private(i)
             for (i = 0; i < p; i++) {
-                double ui = w_prev[i] - ista_size*L_grad[i];
+                T1 ui = w_prev[i] - ista_size*L_grad[i];
                 if (ui > t)
                     w[i] = ui - t;
                 else if (ui < -t)
@@ -581,9 +583,9 @@ private:
                     w[i] = 0.0;
                 D[i] = w[i] - w_prev[i];
             }
-            double order1 = lcddot((int)p, D, 1, L_grad, 1);
-            double order2 = lcddot((int)p, D, 1, D, 1);
-            double f_trial = mdl->computeObject(w);
+            T1 order1 = lcddot((int)p, D, 1, L_grad, 1);
+            T1 order2 = lcddot((int)p, D, 1, D, 1);
+            T1 f_trial = mdl->computeObject(w);
             if (f_trial > obj->f + order1 + (0.5/ista_size)*order2) {
                 ista_size = ista_size * 0.5;
                 continue;
@@ -594,29 +596,29 @@ private:
         return 1;
     }
 
-    void fistaUpdate(double* const t, double* const x) {
-        double t_ = *t;
+    void fistaUpdate(T1* const t, T1* const x) {
+        T1 t_ = *t;
         *t = (1 + sqrt(1+4*t_*t_))*0.5;
-        double c = (t_ - 1) / *t;
+        T1 c = (t_ - 1) / *t;
         for (unsigned long i = 0; i < p; i++) {
-            double yi = w[i] + c*(w[i] - x[i]); // x is x_{k-1}
+            T1 yi = w[i] + c*(w[i] - x[i]); // x is x_{k-1}
             x[i] = w[i];
             w[i] = yi;
         }
     }
 
     /* may generalize to other regularizations beyond l1 */
-    double computeReg(const double* const wnew) {
-        double gval = 0.0;
+    T1 computeReg(const T1* const wnew) {
+        T1 gval = 0.0;
         for (unsigned long i = 0; i < p; i++)
             gval += lmd*fabs(wnew[i]);
         return gval;
     }
 
-    double computeSubgradient() {
-        double subgrad = 0.0;
+    T1 computeSubgradient() {
+        T1 subgrad = 0.0;
         for (unsigned long i = 0; i < p; i++) {
-            double g = L_grad[i];
+            T1 g = L_grad[i];
             if (w[i] != 0.0 || (fabs(g) > lmd)) {
                 if (w[i] > 0)
                     g += lmd;
@@ -708,7 +710,7 @@ private:
         unsigned long numActive = 0;
         /*** select rule 2 ***/
         for (unsigned long j = 0; j < p; j++) {
-            double g = L_grad[j];
+            T1 g = L_grad[j];
             if (w[j] != 0.0 || (fabs(g) > lmd)) {
                 idxs[numActive].i = (unsigned short) j;
                 idxs[numActive].j = (unsigned short) j;
@@ -725,7 +727,7 @@ private:
         unsigned long numActive = 0;
         /*** select rule 2 ***/
         for (unsigned long j = 0; j < p; j++) {
-            double g = L_grad[j];
+            T1 g = L_grad[j];
             if (w[j] != 0.0 || (fabs(g) > lmd + 0.01)) {
                 idxs[numActive].i = (unsigned short) j;
                 idxs[numActive].j = (unsigned short) j;
@@ -742,7 +744,7 @@ private:
         unsigned long numActive = 0;
         /*** select rule 2 ***/
         for (unsigned long j = 0; j < p; j++) {
-            double g = L_grad[j];
+            T1 g = L_grad[j];
             if (w[j] != 0.0 || (fabs(g) > lmd + 0.5)) {
                 idxs[numActive].i = (unsigned short) j;
                 idxs[numActive].j = (unsigned short) j;
@@ -759,7 +761,7 @@ private:
         unsigned long numActive = 0;
         unsigned long zeroActive = 0;
         for (unsigned long j = 0; j < p; j++) {
-            double g = L_grad[j];
+            T1 g = L_grad[j];
             if (w[j] != 0.0 || (fabs(g) > lmd)) {
                 idxs[numActive].i = (unsigned short) j;
                 idxs[numActive].j = (unsigned short) j;
@@ -780,7 +782,7 @@ private:
         unsigned long numActive = 0;
         unsigned long zeroActive = 0;
         for (unsigned long j = 0; j < p; j++) {
-            double g = L_grad[j];
+            T1 g = L_grad[j];
             if (w[j] != 0.0 || (fabs(g) > lmd + 0.01)) {
                 idxs[numActive].i = (unsigned short) j;
                 idxs[numActive].j = (unsigned short) j;
@@ -800,7 +802,7 @@ private:
         unsigned long numActive = 0;
         unsigned long zeroActive = 0;
         for (unsigned long j = 0; j < p; j++) {
-            double g = L_grad[j];
+            T1 g = L_grad[j];
             if (w[j] != 0.0 || (fabs(g) > lmd)) {
                 idxs[numActive].i = j;
                 idxs[numActive].j = j;
@@ -816,7 +818,7 @@ private:
         work_set->numActive = numActive;
     }
 
-    void _insert(unsigned long idx, double vlt, unsigned long n)
+    void _insert(unsigned long idx, T1 vlt, unsigned long n)
     {
         ushort_pair_t* &idxs = work_set->idxs;
         unsigned long end = p-1-n;
@@ -827,7 +829,7 @@ private:
                 for (unsigned long i = j+1, k = j; i > end; i--, k--) {
                     // swap
                     unsigned long tmpj = idxs[k].j;
-                    double tmpv = idxs[k].vlt;
+                    T1 tmpv = idxs[k].vlt;
                     idxs[k].j = idx;
                     idxs[k].vlt = vlt;
                     vlt = tmpv;
@@ -842,9 +844,9 @@ private:
         }
     }
 
-    double _vlt(unsigned long j)
+    T1 _vlt(unsigned long j)
     {
-        double g = L_grad[j];
+        T1 g = L_grad[j];
         if (w[j] > 0) g += lmd;
         else if (w[j] < 0) g -= lmd;
         else g = fabs(g) - lmd;
@@ -861,7 +863,7 @@ private:
         unsigned long zeroActive = 0;
         unsigned long nzeroActive = 0;
         for (unsigned long j = 0; j < p; j++) {
-            double g = fabs(L_grad[j]) - lmd;
+            T1 g = fabs(L_grad[j]) - lmd;
             if (g > 0) {
                 unsigned long end = p-1-zeroActive;
                 idxs[end].j = j;
@@ -896,7 +898,7 @@ private:
         unsigned long zeroActive = 0;
         unsigned long nzeroActive = 0;
         for (unsigned long j = 0; j < p; j++) {
-            double g = fabs(L_grad[j]) - lmd;
+            T1 g = fabs(L_grad[j]) - lmd;
             if (g > 0) {
                 _insert(j, g, zeroActive);
                 zeroActive++;
@@ -927,7 +929,7 @@ private:
             unsigned long j = i + rand()%(lens - i);
             unsigned short k1 = idxs[i].i;
             unsigned short k2 = idxs[i].j;
-            double vlt = idxs[i].vlt;
+            T1 vlt = idxs[i].vlt;
             idxs[i].i = idxs[j].i;
             idxs[i].j = idxs[j].j;
             idxs[i].vlt = idxs[j].vlt;
@@ -947,29 +949,29 @@ private:
 
     int suffcientDecrease() {
         int max_sd_iters = 200;
-        double mu = 1.0;
-        double rho = param->rho;
+        T1 mu = 1.0;
+        T1 rho = param->rho;
         int msgFlag = param->verbose;
-        double z = 0.0;
-        double Hd_j;
-        double Hii;
-        double G;
-        double Gp;
-        double Gn;
-        double wpd;
-        double Hwd;
-        double Qd_bar;
-        double f_mdl;
-        double rho_trial;
-        memcpy(w_prev, w, p*sizeof(double));
-        const double lmd = param->lmd;
+        T1 z = 0.0;
+        T1 Hd_j;
+        T1 Hii;
+        T1 G;
+        T1 Gp;
+        T1 Gn;
+        T1 wpd;
+        T1 Hwd;
+        T1 Qd_bar;
+        T1 f_mdl;
+        T1 rho_trial;
+        memcpy(w_prev, w, p*sizeof(T1));
+        const T1 lmd = param->lmd;
         const unsigned long l = param->l;
-        double* Q = lR->Q;
-        const double* Q_bar = lR->Q_bar;
+        T1* Q = lR->Q;
+        const T1* Q_bar = lR->Q_bar;
         const unsigned short m = lR->m;
-        const double gama = lR->gama;
-        memset(D, 0, p*sizeof(double));
-        memset(d_bar, 0, 2*l*sizeof(double));
+        const T1 gama = lR->gama;
+        memset(D, 0, p*sizeof(T1));
+        memset(d_bar, 0, 2*l*sizeof(T1));
         for (unsigned long k = 0, i = 0; i < work_set->numActive; i++, k += m) {
             H_diag[i] = gama;
             for (unsigned long j = 0; j < m; j++) H_diag[i] -= Q_bar[k+j]*Q[k+j];
@@ -980,11 +982,11 @@ private:
         unsigned long cd_pass;
         int sd_iters;
         for (sd_iters = 0; sd_iters < max_sd_iters; sd_iters++) {
-            double gama_scale = mu*gama;
-            double dH_diag = gama_scale-gama;
+            T1 gama_scale = mu*gama;
+            T1 dH_diag = gama_scale-gama;
             for (cd_pass = 1; cd_pass <= max_cd_pass; cd_pass++) {
-                double diffd = 0;
-                double normd = 0;
+                T1 diffd = 0;
+                T1 normd = 0;
                 for (unsigned long ii = 0; ii < work_set->numActive; ii++) {
                     unsigned long rii = ii;
                     unsigned long idx = idxs[rii].j;
@@ -1015,16 +1017,16 @@ private:
             for (unsigned long i = 0; i < p; i++) {
                 w[i] = w_prev[i] + D[i];
             }
-            double f_trial = mdl->computeObject(w);
-            double g_trial = computeReg(w);
-            double obj_trial = f_trial + g_trial;
-            double order1 = lcddot((int)p, D, 1, L_grad, 1);
-            double order2 = 0;
-            double* buffer = lR->buff;
+            T1 f_trial = mdl->computeObject(w);
+            T1 g_trial = computeReg(w);
+            T1 obj_trial = f_trial + g_trial;
+            T1 order1 = lcddot((int)p, D, 1, L_grad, 1);
+            T1 order2 = 0;
+            T1* buffer = lR->buff;
             int cblas_M = (int) work_set->numActive;
             int cblas_N = (int) m;
             lcdgemv(CblasColMajor, CblasTrans, Q, d_bar, buffer, cblas_N, cblas_M, cblas_N);
-            double vp = 0;
+            T1 vp = 0;
             for (unsigned long ii = 0; ii < work_set->numActive; ii++) {
                 unsigned long idx = idxs[ii].j;
                 unsigned long idx_Q = permut[ii];
@@ -1051,15 +1053,15 @@ private:
     }
 
     template <typename InnerSolver>
-    bool sufficientDecreaseCheck(const double* D, Subproblem<InnerSolver>* const subprob,
-                                 const double gama, double* rho_trial) {
+    bool sufficientDecreaseCheck(const T1* D, Subproblem<InnerSolver, T1>* const subprob,
+                                 const T1 gama, T1* rho_trial) {
         for (unsigned long i = 0; i < p; i++) {
             w[i] = w_prev[i] + D[i];
         }
-        double f_trial = mdl->computeObject(w);
-        double g_trial = computeReg(w);
-        double obj_trial = f_trial + g_trial;
-        double f_mdl = obj->f + subprob->objective_value(gama) + g_trial;
+        T1 f_trial = mdl->computeObject(w);
+        T1 g_trial = computeReg(w);
+        T1 obj_trial = f_trial + g_trial;
+        T1 f_mdl = obj->f + subprob->objective_value(gama) + g_trial;
         *rho_trial = (obj_trial-obj->val)/(f_mdl-obj->val);
         if (*rho_trial > param->rho) {
             obj->add(f_trial, g_trial);

@@ -110,6 +110,8 @@ ELSE (BLA_VENDOR STREQUAL "openblas")
 ENDIF (BLA_VENDOR STREQUAL "openblas")
 target_link_libraries(${TARGET} ${BLAS_LIB})
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CBLAS")
+message(STATUS "blas version " ${BLAS_LIB})
 # Don't add a 'lib' prefix to the shared library
 set_target_properties(${TARGET} PROPERTIES PREFIX "")
 

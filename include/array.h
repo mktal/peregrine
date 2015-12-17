@@ -2,7 +2,7 @@
 * @Author: Xiaocheng Tang
 * @Date:   2015-12-15 16:09:52
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-15 21:12:41
+* @Last Modified time: 2015-12-17 00:31:27
 */
 
 #ifndef __LHAC__Array__
@@ -19,7 +19,7 @@ public:
         memset(m_data, 0, sizeof(TypeValue) * _size);
     }
 
-    Array(TypeValue* data, size_t size) : m_data(data), _size(size) {
+    Array(TypeValue* data, size_t size) : _size(size), m_data(data) {
         std::cout << "no copy" << std::endl;
         _owner = false;
     }
