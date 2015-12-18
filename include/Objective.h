@@ -9,12 +9,14 @@
 #ifndef __LHAC_v1__Objective__
 #define __LHAC_v1__Objective__
 
+#include <stddef.h>
+
 
 template <typename Derived, typename T1>
 class Objective
 {
 public:
-    inline unsigned long getDims() {
+    inline size_t getDims() {
         return static_cast<Derived*>(this)->getDims();
     };
 

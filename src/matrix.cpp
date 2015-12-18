@@ -2,10 +2,10 @@
 * @Author: Xiaocheng Tang
 * @Date:   2015-12-15 15:25:08
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-15 15:42:21
+* @Last Modified time: 2015-12-17 15:11:12
 */
 
-#include "example.h"
+#include "cahow.h"
 
 template <typename TypeValue>
 class Matrix {

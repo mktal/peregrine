@@ -1,83 +1,23 @@
-#!/usr/bin/env python -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # @Date:   2015-12-15 15:23:56
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-17 00:25:54
+# @Last Modified time: 2015-12-17 23:16:05
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
 
 
 import unittest
-from example import Matrix, Array, train
+from cahow import Matrix, Array, train
+from pyspark.mllib.util import MLUtils
 import numpy as np
 import pprint as pp
-from sklearn import datasets
-from sklearn.datasets import load_svmlight_file
-
-
-def verify_gradient(model, eps=0.0001):
-    f, g = model.eval_obj, model.eval_grad
-    d = model.shape[1]
-    w = np.random.random((d,))
-
-    f0 = f(w)
-    g0_ = auto_grad(f, w, eps, f0)
-    g0 = np.zeros_like(w)
-    g(w, g0)
-    return g0, g0_
-
-
-def auto_grad(f_eval, w, eps=0.0001, f0=None, **kwargs):
-    W = eps*np.eye(w.shape[0]) + w
-    f0 = f_eval(w, **kwargs) if f0 is None else f0
-    return np.array([(f_eval(w_, **kwargs) - f0) / eps for w_ in W])
-
-
-def load_digits():
-    train = datasets.load_digits()
-    data, target = train.data, train.target.copy()
-    target[target != 0] = -1
-    target[target == 0] = 1
-    print('load digits for classification: {}'.format(data.shape))
-    return data, target
-
-
-def load_mnist():
-  data, target = load_svmlight_file('/Users/xtang/data/mnist_0_6')
-  print('load mnist for classification: {}'.format(data.shape))
-  return np.asarray(data.todense()), target
-
-
-class LogReg(object):
-    """docstring for LogReg"""
-    def __init__(self, X, Y, cached=False):
-        self.X = X
-        self.Y = Y
-        self.n, self.d = self.shape
-        self.cached = cached
-
-    @property
-    def shape(self):
-        return self.X.shape
-
-    def eval_obj(self, w):
-        w = np.array(w, copy=False)
-        e_ywx_inv = np.exp(-self.Y*np.dot(self.X, w))
-        loss = np.average(np.log1p(e_ywx_inv))
-        if self.cached:
-            self._cache = e_ywx_inv
-        return loss
-
-    def eval_grad(self, w, df):
-        w = np.array(w, copy=False)
-        df = np.array(df, copy=False)
-        if self.cached:
-            e_ywx = 1/self._cache
-        else:
-            e_ywx = np.exp(self.Y*np.dot(self.X, w))
-        a = -self.Y/(1+e_ywx)/self.n
-        # np.dot(a, self.X, out=df)
-        np.copyto(df, np.dot(a, self.X))
+from models import LogReg
+from models import LogRegD
+from utils import verify_gradient
+from utils import load_digits
+from utils import SparkController
 
 
 @unittest.skip('.')
@@ -162,16 +102,14 @@ class TrainTestCase(unittest.TestCase):
         self.assertAlmostEqual(d, 0.0, places=7)
 
     # @unittest.skip('.')
-    def test_Train(self):
-        # data, target = load_digits()
-        data, target = load_mnist()
-        prob = LogReg(data, target, cached=True)
-        f, g = prob.eval_obj, prob.eval_grad
-        train(f, g, prob.shape[1], verbose=1)
-
-
-
-
+    def test_LogRegD(self):
+        with SparkController() as sc:
+            dataset = MLUtils.loadLibSVMFile(sc, './data/a9a').cache()
+            prob = LogRegD(dataset, cached=False)
+            g1, g2 = verify_gradient(prob)
+            d = np.linalg.norm(g1-g2)
+            pp.pprint(d)
+            self.assertAlmostEqual(d, 0.0, places=6)
 
 
 if __name__ == '__main__':

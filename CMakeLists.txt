@@ -83,13 +83,13 @@ set(PYBIND11_HEADERS
   include/lhac.h
 )
 
-set(TARGET example)
-set(OUTPUT_DIR ${PROJECT_SOURCE_DIR})
+set(TARGET cahow)
+set(OUTPUT_DIR ${PROJECT_SOURCE_DIR}/examples)
 
 # Create the binding library
 add_library(${TARGET} SHARED
   ${PYBIND11_HEADERS}
-  src/example.cpp
+  src/cahow.cpp
   src/matrix.cpp
   src/array.cpp
   src/lhac-py-gen.cpp

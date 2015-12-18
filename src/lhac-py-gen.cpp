@@ -1,7 +1,7 @@
 /*
 * @Date:   2015-12-15 16:13:07
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-16 23:50:00
+* @Last Modified time: 2015-12-17 23:46:34
 *
 * Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 * All rights reserved.
@@ -69,7 +69,7 @@ void test_objective(py::object f_func, py::object g_func, size_t dim) {
 
 void train(py::object f_func, py::object g_func, size_t dim,
            size_t verbose = 2, double opt_tol = 1e-8, size_t max_iter = 500,
-           size_t memory = 10, double lambda = 1e-6) {
+           size_t memory = 10, double l1_reg = 1e-6) {
     // shrink -> gama = gama / shrink
     double shrink = 4;
     unsigned long cd_rate = 6;
@@ -86,7 +86,7 @@ void train(py::object f_func, py::object g_func, size_t dim,
     param->l = memory;
     param->work_size = work_size;
     param->max_iter = max_iter;
-    param->lmd = lambda;
+    param->lmd = l1_reg;
     param->opt_outer_tol = opt_tol;
     param->verbose = verbose;
     param->shrink = shrink;
@@ -107,7 +107,7 @@ void init_train(py::module &m) {
           py::arg("f_func"), py::arg("g_func"), py::arg("dim"),
           py::arg("verbose") = 2, py::arg("opt_tol") = 1e-8,
           py::arg("max_iter") = 500, py::arg("memory") = 10,
-          py::arg("lambda") = 1e-6);
+          py::arg("l1_reg") = 1e-6);
     m.def("test_objective", &test_objective);
 }
 

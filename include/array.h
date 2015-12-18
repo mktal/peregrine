@@ -2,25 +2,23 @@
 * @Author: Xiaocheng Tang
 * @Date:   2015-12-15 16:09:52
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-17 00:31:27
+* @Last Modified time: 2015-12-17 23:44:32
 */
 
 #ifndef __LHAC__Array__
 #define __LHAC__Array__
 
-#include "example.h"
+#include "cahow.h"
 
 template <typename TypeValue>
 class Array {
 public:
     Array(size_t size) : _size(size) {
-        std::cout << "copy" << std::endl;
         m_data = new TypeValue[_size];
         memset(m_data, 0, sizeof(TypeValue) * _size);
     }
 
     Array(TypeValue* data, size_t size) : _size(size), m_data(data) {
-        std::cout << "no copy" << std::endl;
         _owner = false;
     }
 
@@ -30,7 +28,6 @@ public:
     }
 
     Array(Array &&s) : _size(s._size), m_data(s.m_data) {
-        std::cout << "move" << std::endl;
         s._size = 0;
         s.m_data = nullptr;
     }
@@ -39,8 +36,6 @@ public:
         if (_owner) {
             delete[] m_data;
         }
-        else
-            std::cout << "not freeing" << std::endl;
     }
 
     Array &operator=(const Array &s) {
