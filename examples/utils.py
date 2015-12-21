@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 23:01:45
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-17 23:03:14
+# @Last Modified time: 2015-12-21 00:58:35
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -35,7 +35,7 @@ class SparkController(object):
 def verify_gradient(model, eps=0.0001):
     f, g = model.eval_obj, model.eval_grad
     d = model.shape[1]
-    w = np.random.random((d,))
+    w = 10*np.random.random((d,))
 
     f0 = f(w)
     g0_ = auto_grad(f, w, eps, f0)

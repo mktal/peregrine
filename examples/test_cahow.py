@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-15 15:23:56
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-17 23:16:05
+# @Last Modified time: 2015-12-21 00:29:45
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -15,6 +15,7 @@ import numpy as np
 import pprint as pp
 from models import LogReg
 from models import LogRegD
+from models import LogRegDD
 from utils import verify_gradient
 from utils import load_digits
 from utils import SparkController
@@ -101,11 +102,21 @@ class TrainTestCase(unittest.TestCase):
         pp.pprint(d)
         self.assertAlmostEqual(d, 0.0, places=7)
 
-    # @unittest.skip('.')
+    @unittest.skip('.')
     def test_LogRegD(self):
         with SparkController() as sc:
             dataset = MLUtils.loadLibSVMFile(sc, './data/a9a').cache()
             prob = LogRegD(dataset, cached=False)
+            g1, g2 = verify_gradient(prob)
+            d = np.linalg.norm(g1-g2)
+            pp.pprint(d)
+            self.assertAlmostEqual(d, 0.0, places=6)
+
+    # @unittest.skip('.')
+    def test_LogRegDD(self):
+        with SparkController() as sc:
+            dataset = MLUtils.loadLibSVMFile(sc, './data/a9a')
+            prob = LogRegDD(dataset, cached=False)
             g1, g2 = verify_gradient(prob)
             d = np.linalg.norm(g1-g2)
             pp.pprint(d)
