@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-21 14:52:30
+# @Last Modified time: 2015-12-22 20:24:50
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -40,9 +40,11 @@ def cahowLogReg(sc, data_path):
     train(f, g, prob.shape[1], verbose=1, max_iter=30, l1_reg=0.001)
 
 
-with SparkController() as sc:
-    # sparkLogReg(sc, './data/a9a')
-    cahowLogReg(sc, './data/a9a')
+if __name__ == '__main__':
+    with SparkController() as sc:
+        # sparkLogReg(sc, './data/a9a')
+        cahowLogReg(sc, './data/a9a')
+
 
 
 
