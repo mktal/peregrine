@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-21 01:11:20
+# @Last Modified time: 2015-12-21 14:52:30
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -29,15 +29,15 @@ def sparkLogReg(sc, data_path):
     sqlContext = SQLContext(sc)
     # df = sqlContext.read.format('libsvm').load(data_path)
     df = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).toDF().cache()
-    lr = LogisticRegression(maxIter=300, regParam=0.01, elasticNetParam=1.,
+    lr = LogisticRegression(maxIter=300, regParam=0.001, elasticNetParam=1.,
                             fitIntercept=False)
     lr.fit(df.replace(-1, 0, 'label').cache())
 
 def cahowLogReg(sc, data_path):
-    dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).cache()
+    dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=2).cache()
     prob = LogRegDD(dataset, cached=True)
     f, g = prob.eval_obj, prob.eval_grad
-    train(f, g, prob.shape[1], verbose=1, max_iter=20, l1_reg=0.01)
+    train(f, g, prob.shape[1], verbose=1, max_iter=30, l1_reg=0.001)
 
 
 with SparkController() as sc:

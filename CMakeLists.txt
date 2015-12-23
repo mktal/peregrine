@@ -7,13 +7,12 @@
 
 cmake_minimum_required(VERSION 2.8)
 
-project(pybind11)
+project(cahow)
 
 option(PYBIND11_INSTALL "Install pybind11 header files?" ON)
 
 # Add a CMake parameter for choosing a desired Python version
 set(PYBIND11_PYTHON_VERSION "" CACHE STRING "Python version to use for compiling the example application")
-message(STATUS "python version " ${PYBIND11_PYTHON_VERSION})
 
 
 # Set a default build configuration if none is specified. 'MinSizeRel' produces the smallest binaries
@@ -29,10 +28,8 @@ set(Python_ADDITIONAL_VERSIONS 3.4 3.5 3.6)
 find_package(PythonLibs ${PYBIND11_PYTHON_VERSION} REQUIRED)
 find_package(PythonInterp ${PYBIND11_PYTHON_VERSION} REQUIRED)
 
-message(STATUS "python version after " ${PYBIND11_PYTHON_VERSION})
 
 include(CheckCXXCompilerFlag)
-message(STATUS "CheckCXXCompilerFlag version " ${CheckCXXCompilerFlag})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   # Enable C++11 mode on C++ / Clang
@@ -70,13 +67,6 @@ include_directories(${PYTHON_INCLUDE_DIR})
 include_directories(include)
 
 set(PYBIND11_HEADERS
-  # /Users/xtang/Documents/LHAC/include/pybind11/cast.h
-  # /Users/xtang/Documents/LHAC/include/pybind11/common.h
-  # /Users/xtang/Documents/LHAC/include/pybind11/operators.h
-  # /Users/xtang/Documents/LHAC/include/pybind11/pybind11.h
-  # /Users/xtang/Documents/LHAC/include/pybind11/pytypes.h
-  # /Users/xtang/Documents/LHAC/include/pybind11/typeid.h
-  # /Users/xtang/Documents/LHAC/include/pybind11/numpy.h
   include/pybind11/pybind11.h
   include/pybind11/functional.h
   include/Objective.h
@@ -111,7 +101,6 @@ ENDIF (BLA_VENDOR STREQUAL "openblas")
 target_link_libraries(${TARGET} ${BLAS_LIB})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CBLAS")
-message(STATUS "blas version " ${BLAS_LIB})
 # Don't add a 'lib' prefix to the shared library
 set_target_properties(${TARGET} PROPERTIES PREFIX "")
 
