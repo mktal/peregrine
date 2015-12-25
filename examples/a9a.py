@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-22 20:24:50
+# @Last Modified time: 2015-12-25 00:54:09
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -15,8 +15,8 @@ from pyspark.ml.classification import LogisticRegression
 from pyspark.sql import SQLContext
 from pyspark.sql import Row
 from utils import SparkController
-from models import LogRegD
-from models import LogRegDD
+from models import LogRegDV
+from models import LogRegDM
 from cahow import train
 
 
@@ -34,8 +34,8 @@ def sparkLogReg(sc, data_path):
     lr.fit(df.replace(-1, 0, 'label').cache())
 
 def cahowLogReg(sc, data_path):
-    dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=2).cache()
-    prob = LogRegDD(dataset, cached=True)
+    dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).cache()
+    prob = LogRegDM(dataset, cached=True)
     f, g = prob.eval_obj, prob.eval_grad
     train(f, g, prob.shape[1], verbose=1, max_iter=30, l1_reg=0.001)
 

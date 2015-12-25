@@ -2,70 +2,47 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 14:53:14
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-21 01:10:48
+# @Last Modified time: 2015-12-25 00:50:03
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
 
 import numpy as np
+from scipy.sparse import csr_matrix
 from pprint import pprint
 from collections import namedtuple
+from functools import partial
+from itertools import izip
+from itertools import imap
+from itertools import repeat
+from itertools import chain
 
 
-def sLogReg(lmd=0.0001):
-    """ Log Reg Single row"""
-    def obj_and_grad(w, row):
-        x, y = row.features, row.label
-        e_ywx = np.exp(y*x.dot(w))
-        # loss = np.log(1/e_ywx + 1)
-        loss = np.log1p(1/e_ywx)
-        a = -1*y/(1+e_ywx)
-        reg = lmd*0.5*w.dot(w)
-        df = lmd*w
-        df[x.indices] += a*x.values
-        return loss + reg, df
-    return obj_and_grad
 
-def sLogRegD(lmd=0.0001):
-    """ Log Reg Single row Dense"""
-    def obj_and_grad(w, row):
-        X, Y, n = row.features, row.labels, row.n_samples
-        e_ywx = np.exp(Y*np.dot(X, w))
-        loss = np.average(np.log1p(1/e_ywx))
-        a = -Y/(1+e_ywx)/n
-        df = np.dot(a, X)
-        return loss + lmd*0.5*w.dot(w), df
-    return obj_and_grad
-
-
-class LogRegD(object):
-    """ LogReg Distributed"""
-    def __init__(self, labeledPoints, cached=False, l2_reg=0.):
+class BaseLogReg(object):
+    """Base class for log reg"""
+    def __init__(self, labeledPoints,
+                 transition_func, merge_func,
+                 cached=False, l2_reg=0., ):
         self.labeledPoints = labeledPoints
         self.n = self.labeledPoints.count()
         self.d = self.labeledPoints.first().features.size
         self.cached = cached
-        # self.labeledPoints = self.labeledPoints.glom()
-        self._single_eval = sLogReg(l2_reg)
+        self.l2_reg = l2_reg
+        self._transition_func = transition_func
+        self._merge_func = merge_func
         self._cached_grad = None
 
     @property
     def shape(self):
         return self.n, self.d
 
-    def _full_batch(self, w, func):
-        # row[1] is a list of LabeledData
-        def seqOp(v, row):
-            l, g = func(w, row)
-            return v[0]+l, v[1]+g
-        def combOp(v1, v2):
-            return v1[0]+v2[0], v1[1]+v2[1]
-        total = self.labeledPoints.treeAggregate((0,0), seqOp, combOp)
-        return total[0] / self.n, total[1] / self.n
-
     def eval_obj(self, w):
         w = np.array(w, copy=False)
-        l, self._cached_grad = self._full_batch(w, self._single_eval)
+        l, self._cached_grad = self._merge_func(self.labeledPoints,
+                                                w, self._transition_func)
+        l += self.l2_reg*0.5*w.dot(w)
+        self._cached_grad += self.l2_reg*w
         if not self.cached:
             self._cached_grad = None
         return l
@@ -74,40 +51,93 @@ class LogRegD(object):
         w = np.array(w, copy=False)
         df = np.array(df, copy=False)
         if self._cached_grad is None:
-            _, self._cached_grad = self._full_batch(w, self._single_eval)
+            _, self._cached_grad = self._merge_func(self.labeledPoints,
+                                                    w, self._transition_func)
         np.copyto(df, self._cached_grad)
 
 
-class LogRegDD(LogRegD):
-    """ LogReg Distributed Dense"""
+
+class LogRegDV(BaseLogReg):
+    """ LogReg Distributed Vector form"""
     def __init__(self, labeledPoints, cached=False, l2_reg=0.):
-        def make_matrix(rows):
+        def _merge(datasets, w, func):
+            def seqOp(v, rows):
+                agg = lambda r, v: (r[0]+v[0], r[1]+v[1])
+                l, g = reduce(agg, (func(w, row) for row in rows))
+                return v[0]+l, v[1]+g
+            def combOp(v1, v2):
+                return v1[0]+v2[0], v1[1]+v2[1]
+            total = datasets.treeAggregate((0,0), seqOp, combOp)
+            return total[0] / self.n, total[1] / self.n
+
+        def _transition(w, row):
+            """ Log Reg Single row"""
+            x, y = row.features, row.label
+            e_ywx = np.exp(y*x.dot(w))
+            loss = np.log1p(1/e_ywx)
+            a = -1*y/(1+e_ywx)
+            df = np.zeros_like(w)
+            df[x.indices] += a*x.values
+            return loss, df
+
+        super(LogRegDV, self).__init__(labeledPoints, _transition, _merge,
+                                      cached=cached, l2_reg=l2_reg)
+        self.labeledPoints = self.labeledPoints.glom().cache()
+
+
+class LogRegDM(BaseLogReg):
+    """ LogReg Distributed Matrix form"""
+    def __init__(self, labeledPoints, cached=False, l2_reg=0., dense=False):
+        def make_matrix_dense(rows):
             _Row = namedtuple('Row', 'features, labels, n_samples')
             Y = np.array([r.label for r in rows])
             X = np.array([r.features.toArray() for r in rows])
             return _Row(X, Y, X.shape[0])
 
-        super(LogRegDD, self).__init__(labeledPoints,
-                                       cached=cached,
-                                       l2_reg=l2_reg)
-        self.labeledPoints = labeledPoints.glom().map(make_matrix).cache()
-        # import ipdb; ipdb.set_trace()
-        self._single_eval = sLogRegD(l2_reg)
+        def make_matrix_sparse(rows):
+            _Row = namedtuple('Row', 'features, labels, n_samples')
+            Y = np.array([r.label for r in rows])
+            n, d = len(rows), rows[0].features.size
+            col = np.array(list(chain.from_iterable(
+                           r.features.indices for r in rows)))
+            row = np.array(list(chain.from_iterable(
+                           repeat(i, len(r.features.indices))
+                           for i, r in enumerate(rows))))
+            vals = np.array(list(chain.from_iterable(
+                            r.features.values for r in rows)))
+            X = csr_matrix((vals, (row, col)), shape=(n, d))
+            return _Row(X, Y, n)
 
-    def _full_batch(self, w, func):
-        # row[1] is a list of LabeledData
-        def seqOp(v, row):
-            l, g = func(w, row)
-            return v[0]+l, v[1]+g, row.n_samples
-        def combOp(v1, v2):
-            n1, n2 = v1[2], v2[2]
-            total = n1 + n2
-            f = (n1*v1[0] + n2*v2[0]) / total
-            g = (n1*v1[1] + n2*v2[1]) / total
-            return f, g, total
-        res = self.labeledPoints.treeAggregate((0,0), seqOp, combOp)
-        assert(res[2] == self.n)
-        return res[0], res[1]
+        def _merge(datasets, w, func):
+            # row[1] is a list of LabeledData
+            def seqOp(v, row):
+                l, g = func(w, row)
+                return v[0]+l, v[1]+g, row.n_samples
+            def combOp(v1, v2):
+                n1, n2 = v1[2], v2[2]
+                total = n1 + n2
+                f = (n1*v1[0] + n2*v2[0]) / total
+                g = (n1*v1[1] + n2*v2[1]) / total
+                return f, g, total
+            res =datasets.treeAggregate((0,0), seqOp, combOp)
+            assert(res[2] == self.n)
+            return res[0], res[1]
+
+        def _transition(w, row):
+            """ Log Reg Single row Dense"""
+            X, Y, n = row.features, row.labels, row.n_samples
+            e_ywx = np.exp(Y*X.dot(w))
+            loss = np.average(np.log1p(1/e_ywx))
+            a = -Y/(1+e_ywx)/n
+            # df = np.dot(a, X)
+            df = X.transpose().dot(a)
+            return loss, df
+
+        super(LogRegDM, self).__init__(labeledPoints, _transition, _merge,
+                                      cached=cached, l2_reg=l2_reg)
+        make_matrix = make_matrix_dense if dense else make_matrix_sparse
+        self.labeledPoints = self.labeledPoints.glom().map(make_matrix).cache()
+        # import ipdb; ipdb.set_trace()
 
 
 class LogReg(object):
