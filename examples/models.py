@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 14:53:14
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-25 00:50:03
+# @Last Modified time: 2016-01-01 17:57:52
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -16,7 +16,6 @@ from itertools import izip
 from itertools import imap
 from itertools import repeat
 from itertools import chain
-
 
 
 class BaseLogReg(object):
@@ -37,24 +36,45 @@ class BaseLogReg(object):
     def shape(self):
         return self.n, self.d
 
-    def eval_obj(self, w):
+    @property
+    def eval_obj(self):
+        if self.cached:
+            return self._eval_obj_c
+        else:
+            return self._eval_obj
+
+    @property
+    def eval_grad(self):
+        if self.cached:
+            return self._eval_grad_c
+        else:
+            return self._eval_grad
+
+    def _eval_obj(self, w):
+        w = np.array(w, copy=False)
+        l, _ = self._merge_func(self.labeledPoints, w, self._transition_func)
+        l += self.l2_reg*0.5*w.dot(w)
+        return l
+
+    def _eval_obj_c(self, w):
         w = np.array(w, copy=False)
         l, self._cached_grad = self._merge_func(self.labeledPoints,
                                                 w, self._transition_func)
         l += self.l2_reg*0.5*w.dot(w)
         self._cached_grad += self.l2_reg*w
-        if not self.cached:
-            self._cached_grad = None
         return l
 
-    def eval_grad(self, w, df):
+    def _eval_grad(self, w, df):
         w = np.array(w, copy=False)
         df = np.array(df, copy=False)
-        if self._cached_grad is None:
-            _, self._cached_grad = self._merge_func(self.labeledPoints,
-                                                    w, self._transition_func)
+        _, self._cached_grad = self._merge_func(self.labeledPoints,
+                                                w, self._transition_func)
+        self._cached_grad += self.l2_reg*w
         np.copyto(df, self._cached_grad)
 
+    def _eval_grad_c(self, w, df):
+        df = np.array(df, copy=False)
+        np.copyto(df, self._cached_grad)
 
 
 class LogRegDV(BaseLogReg):
@@ -137,7 +157,6 @@ class LogRegDM(BaseLogReg):
                                       cached=cached, l2_reg=l2_reg)
         make_matrix = make_matrix_dense if dense else make_matrix_sparse
         self.labeledPoints = self.labeledPoints.glom().map(make_matrix).cache()
-        # import ipdb; ipdb.set_trace()
 
 
 class LogReg(object):

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-15 15:23:56
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-25 00:49:33
+# @Last Modified time: 2016-01-01 17:46:16
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -115,11 +115,17 @@ class DistributedTrainTestCase(unittest.TestCase):
     def tearDown(cls):
         cls.sc.stop()
 
+    def _run_verify(self, prob):
+        g1, g2 = verify_gradient(prob, 1e-8)
+        d = np.linalg.norm(g1-g2)
+        pp.pprint(d)
+        self.assertAlmostEqual(d, 0.0, places=5)
+
     @unittest.skip('.')
     def test_LogRegDV(self):
         sc = self.sc
         dataset = MLUtils.loadLibSVMFile(sc, './data/a9a').cache()
-        prob = LogRegDV(dataset, cached=False)
+        prob = LogRegDV(dataset, cached=False, l2_reg=1)
         g1, g2 = verify_gradient(prob)
         d = np.linalg.norm(g1-g2)
         pp.pprint(d)
@@ -129,11 +135,10 @@ class DistributedTrainTestCase(unittest.TestCase):
     def test_LogRegDM(self):
         sc = self.sc
         dataset = MLUtils.loadLibSVMFile(sc, './data/a9a')
-        prob = LogRegDM(dataset, cached=False, dense=False)
-        g1, g2 = verify_gradient(prob)
-        d = np.linalg.norm(g1-g2)
-        pp.pprint(d)
-        self.assertAlmostEqual(d, 0.0, places=6)
+        prob = LogRegDM(dataset, cached=False, dense=False, l2_reg=0.001)
+        self._run_verify(prob)
+        prob = LogRegDM(dataset, cached=False, dense=True, l2_reg=0.001)
+        self._run_verify(prob)
 
 
 if __name__ == '__main__':

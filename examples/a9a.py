@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-25 00:54:09
+# @Last Modified time: 2016-01-01 17:48:01
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -35,7 +35,7 @@ def sparkLogReg(sc, data_path):
 
 def cahowLogReg(sc, data_path):
     dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).cache()
-    prob = LogRegDM(dataset, cached=True)
+    prob = LogRegDM(dataset, cached=True, l2_reg=0.001)
     f, g = prob.eval_obj, prob.eval_grad
     train(f, g, prob.shape[1], verbose=1, max_iter=30, l1_reg=0.001)
 
