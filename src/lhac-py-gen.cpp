@@ -1,7 +1,7 @@
 /*
 * @Date:   2015-12-15 16:13:07
-* @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-17 23:46:34
+* @Last Modified by:   xtang
+* @Last Modified time: 2016-01-04 19:50:31
 *
 * Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 * All rights reserved.
@@ -17,25 +17,19 @@ template <typename T1>
 class PyObjective : public Objective<PyObjective<T1>, T1>
 {
 public:
-    size_t getDims() const {
-        return _dim;
-    }
+    inline size_t getDims() const { return _dim; }
 
-    T1 computeObject(T1 *wnew) {
-        // Array<T1> a = Array<T1>(wnew, _dim);
-        Array<T1> a(wnew, _dim);
-        py::object res = _f_func.call(a);
+    inline T1 computeObject(T1 *wnew) {
+        py::object res = _f_func.call(Array<T1>(wnew, _dim));
         return res.cast<T1>();
     }
 
-    void computeGradient(T1* wnew, T1* df) {
-        Array<T1> a(wnew, _dim);
-        Array<T1> b(df, _dim);
-        py::object res = _g_func.call(a, b);
-        return;
+    inline void computeGradient(T1* wnew, T1* df) {
+        _g_func.call(Array<T1>(wnew, _dim), Array<T1>(df, _dim));
     }
 
-    PyObjective(py::object f_func, py::object g_func, size_t dim) : _f_func(f_func), _g_func(g_func), _dim(dim) {}
+    PyObjective(py::object f_func, py::object g_func, size_t dim)
+    : _f_func(f_func), _g_func(g_func), _dim(dim) {}
 
 private:
     py::object _f_func;
@@ -78,7 +72,6 @@ void train(py::object f_func, py::object g_func, size_t dim,
     // active set strategy -- standard (default)
     unsigned long active_set = STD;
 //    unsigned long active_set = GREEDY_ADDZERO;
-    // LBFGS limited memory parameter
     int method_flag = 4;
     double rho = 0.5;
 
@@ -99,6 +92,10 @@ void train(py::object f_func, py::object g_func, size_t dim,
 
     LHAC<PyObjective<float>, float>* Alg = new LHAC<PyObjective<float>, float>(prob, param);
     Solution<float>* sols = Alg->solve();
+    delete prob;
+    delete param;
+    delete Alg;
+    delete sols;
 }
 
 

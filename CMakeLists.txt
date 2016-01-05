@@ -63,6 +63,8 @@ endif()
 # Include path for Python header files
 include_directories(${PYTHON_INCLUDE_DIR})
 
+message(STATUS "python include: " ${PYTHON_INCLUDE_DIR})
+message(STATUS "python link: " ${PYTHON_LIBRARY})
 # Include path for pybind11 header files
 include_directories(include)
 

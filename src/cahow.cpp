@@ -13,8 +13,8 @@ void init_array(py::module &);
 void init_matrix(py::module &);
 void init_train(py::module &);
 
-PYBIND11_PLUGIN(cahow) {
-    py::module m("cahow", "pybind example plugin");
+PYBIND11_PLUGIN(_cahow) {
+    py::module m("_cahow", "Proximal L-BFGS solver for composite functions.");
 
     init_array(m);
     init_matrix(m);

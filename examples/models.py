@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 14:53:14
-# @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-01-01 17:57:52
+# @Last Modified by:   xtang
+# @Last Modified time: 2016-01-04 12:19:55
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -22,7 +22,7 @@ class BaseLogReg(object):
     """Base class for log reg"""
     def __init__(self, labeledPoints,
                  transition_func, merge_func,
-                 cached=False, l2_reg=0., ):
+                 cached=False, l2_reg=0.):
         self.labeledPoints = labeledPoints
         self.n = self.labeledPoints.count()
         self.d = self.labeledPoints.first().features.size
@@ -144,7 +144,7 @@ class LogRegDM(BaseLogReg):
             return res[0], res[1]
 
         def _transition(w, row):
-            """ Log Reg Single row Dense"""
+            """ Log Reg Single row (dense or sparse). """
             X, Y, n = row.features, row.labels, row.n_samples
             e_ywx = np.exp(Y*X.dot(w))
             loss = np.average(np.log1p(1/e_ywx))

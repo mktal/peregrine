@@ -2,10 +2,6 @@
 /build*
 /example/build*
 
-# sublime files
-*.sublime-project
-*.sublime-workspace
-
 # Ignore generated code files
 *.so
 *.o
@@ -40,7 +36,6 @@ auto
 /tags*
 .tags*
 
-/Makefile
 .predictive
 .Rhistory
 eproject.cfg

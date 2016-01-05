@@ -18,9 +18,8 @@ public:
         memset(m_data, 0, sizeof(TypeValue) * _size);
     }
 
-    Array(TypeValue* data, size_t size) : _size(size), m_data(data) {
-        _owner = false;
-    }
+    Array(TypeValue* data, size_t size)
+    : _size(size), _owner(false), m_data(data) {}
 
     Array(const Array &s) : _size(s._size) {
         m_data = new TypeValue[_size];

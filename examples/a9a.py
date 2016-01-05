@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
-# @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-01-01 17:48:01
+# @Last Modified by:   xtang
+# @Last Modified time: 2016-01-04 16:53:15
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -17,7 +17,7 @@ from pyspark.sql import Row
 from utils import SparkController
 from models import LogRegDV
 from models import LogRegDM
-from cahow import train
+from _cahow import train
 
 
 def transformLabel(row):
