@@ -11,15 +11,15 @@ CXX=clang++
 
 CXX_INCLUDES = -I ./include -I${PYTHON_INCLUDE}
 LDBLAS = -llapack -lblas
+CXXBLAS = -DUSE_CBLAS
 
 ifeq ($(USE_ACCELERATE), true)
-	CXXBLAS =  -DUSE_CBLAS
 	LDBLAS = -framework Accelerate -framework CoreFoundation
     $(info **use accelerate BLAS....)
 endif
 ifeq ($(USE_OPENBLAS), true)
-	CXXBLAS =  -DUSE_CBLAS
 	LDBLAS = -llapack -lopenblas -L$(OPENBLAS_LINK)
+    $(info **use openBLAS....)
 endif
 
 LDPYTHON = -Wl,-rpath,$(PYTHON_ROOT) -L${PYTHON_LINK} -lpython2.7

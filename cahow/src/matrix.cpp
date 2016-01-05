@@ -1,8 +1,8 @@
 /*
 * @Author: Xiaocheng Tang
 * @Date:   2015-12-15 15:25:08
-* @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-17 15:11:12
+* @Last Modified by:   xtang
+* @Last Modified time: 2016-01-04 20:04:57
 */
 
 #include "cahow.h"
@@ -16,7 +16,7 @@ public:
         memset(m_data, 0, sizeof(TypeValue) * rows * cols);
     }
 
-    Matrix(TypeValue* data, size_t rows, size_t cols) : m_data(data), m_rows(rows), m_cols(cols) {
+    Matrix(TypeValue* data, size_t rows, size_t cols) : m_rows(rows), m_cols(cols), m_data(data) {
         std::cout << "Value constructor no copy: Creating a " << rows << "x" << cols << " matrix " << std::endl;
         owner = false;
     }
