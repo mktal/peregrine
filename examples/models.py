@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 14:53:14
-# @Last Modified by:   xtang
-# @Last Modified time: 2016-01-04 12:19:55
+# @Last Modified by:   Xiaocheng Tang
+# @Last Modified time: 2016-01-05 21:09:19
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -139,7 +139,7 @@ class LogRegDM(BaseLogReg):
                 f = (n1*v1[0] + n2*v2[0]) / total
                 g = (n1*v1[1] + n2*v2[1]) / total
                 return f, g, total
-            res =datasets.treeAggregate((0,0), seqOp, combOp)
+            res =datasets.treeAggregate((0, 0), seqOp, combOp)
             assert(res[2] == self.n)
             return res[0], res[1]
 

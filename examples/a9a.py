@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
-# @Last Modified by:   xtang
-# @Last Modified time: 2016-01-04 16:53:15
+# @Last Modified by:   Xiaocheng Tang
+# @Last Modified time: 2016-01-05 21:25:50
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -17,7 +17,7 @@ from pyspark.sql import Row
 from utils import SparkController
 from models import LogRegDV
 from models import LogRegDM
-from _cahow import train
+from ..peregrine import descend
 
 
 def transformLabel(row):
@@ -36,14 +36,13 @@ def sparkLogReg(sc, data_path):
 def cahowLogReg(sc, data_path):
     dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).cache()
     prob = LogRegDM(dataset, cached=True, l2_reg=0.001)
-    f, g = prob.eval_obj, prob.eval_grad
-    train(f, g, prob.shape[1], verbose=1, max_iter=30, l1_reg=0.001)
+    descend(prob, verbose=1, max_iter=30, l1_reg=0.001)
 
 
 if __name__ == '__main__':
     with SparkController() as sc:
         # sparkLogReg(sc, './data/a9a')
-        cahowLogReg(sc, './data/a9a')
+        cahowLogReg(sc, '/Users/xtang/Documents/cahow/examples/data/a9a')
 
 
 

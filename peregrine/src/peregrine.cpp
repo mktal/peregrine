@@ -7,17 +7,15 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
-#include <cahow.h>
+#include <peregrine.h>
 
 void init_array(py::module &);
-void init_matrix(py::module &);
 void init_train(py::module &);
 
-PYBIND11_PLUGIN(_cahow) {
-    py::module m("_cahow", "Proximal L-BFGS solver for composite functions.");
+PYBIND11_PLUGIN(_peregrine) {
+    py::module m("_peregrine", "Proximal L-BFGS solver for composite functions.");
 
     init_array(m);
-    init_matrix(m);
     init_train(m);
 
     return m.ptr();

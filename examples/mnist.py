@@ -2,17 +2,17 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 15:01:49
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2015-12-17 15:03:34
+# @Last Modified time: 2016-01-05 21:15:39
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
 
 
-from models import LogReg, load_mnist
-from cahow import train
+from models import LogReg
+from utils import load_mnist
+from ..peregrine import descend
 
 
 data, target = load_mnist()
 prob = LogReg(data, target, cached=True)
-f, g = prob.eval_obj, prob.eval_grad
-train(f, g, prob.shape[1], verbose=1)
+descend(prob, prob.shape[1], verbose=1, precision='d')

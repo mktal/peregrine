@@ -26,7 +26,7 @@ LDPYTHON = -Wl,-rpath,$(PYTHON_ROOT) -L${PYTHON_LINK} -lpython2.7
 LDFLAGS = -Wall -shared ${LDPYTHON} ${LDBLAS}
 CXXOPTFLAGS = -Wall -fpic -m64 -fno-omit-frame-pointer -std=c++11 -O3 -DNDEBUG ${CXXBLAS} $(CXX_INCLUDES)
 
-%.so: src/cahow.cpp src/matrix.cpp src/array.cpp src/lhac-py-gen.cpp
+%.so: src/peregrine.cpp src/array.cpp src/lhac-py-gen.cpp
 	$(CXX) $(CXXOPTFLAGS) $(LDFLAGS) $^ -o $@
 
 clean :

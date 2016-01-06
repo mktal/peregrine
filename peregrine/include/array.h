@@ -2,13 +2,13 @@
 * @Author: Xiaocheng Tang
 * @Date:   2015-12-15 16:09:52
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-17 23:44:32
+* @Last Modified time: 2016-01-05 21:19:13
 */
 
 #ifndef __LHAC__Array__
 #define __LHAC__Array__
 
-#include "cahow.h"
+#include "peregrine.h"
 
 template <typename TypeValue>
 class Array {
