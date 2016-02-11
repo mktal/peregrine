@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-05 21:51:20
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-01-05 22:05:10
+# @Last Modified time: 2016-02-10 22:50:37
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -105,7 +105,6 @@ class LogRegDM(object):
         return l
 
     def _eval_obj_c(self, w):
-        print 'eval obj'
         w = np.array(w, copy=False)
         l, self._cached_grad = self._merge_func(self.labeledPoints,
                                                 w, self._transition_func)
@@ -122,7 +121,6 @@ class LogRegDM(object):
         np.copyto(df, self._cached_grad)
 
     def _eval_grad_c(self, w, df):
-        print 'eval grad'
         df = np.array(df, copy=False)
         np.copyto(df, self._cached_grad)
 

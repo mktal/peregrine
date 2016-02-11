@@ -14,7 +14,6 @@
 #include <set>
 #include <iostream>
 
-
 #if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable: 4127) // warning C4127: Conditional expression is constant
@@ -23,76 +22,101 @@
 NAMESPACE_BEGIN(pybind11)
 NAMESPACE_BEGIN(detail)
 
-template <typename Value, typename Alloc> struct type_caster<std::vector<Value, Alloc>> {
-    typedef std::vector<Value, Alloc> type;
-    typedef type_caster<Value> value_conv;
+template <typename Type, typename Alloc> struct type_caster<std::vector<Type, Alloc>> {
+    typedef std::vector<Type, Alloc> vector_type;
+    typedef type_caster<Type> value_conv;
 public:
-    bool load(PyObject *src, bool convert) {
-        if (!PyList_Check(src))
+    bool load(handle src, bool convert) {
+        list l(src, true);
+        if (!l.check())
             return false;
-        size_t size = (size_t) PyList_GET_SIZE(src);
-        value.reserve(size);
+        value.reserve(l.size());
         value.clear();
         value_conv conv;
-        for (size_t i=0; i<size; ++i) {
-            if (!conv.load(PyList_GetItem(src, (ssize_t) i), convert))
+        for (auto it : l) {
+            if (!conv.load(it, convert))
                 return false;
-            value.push_back((Value) conv);
+            value.push_back((Type) conv);
         }
         return true;
     }
 
-    static PyObject *cast(const type &src, return_value_policy policy, PyObject *parent) {
-        PyObject *list = PyList_New(src.size());
+    static handle cast(const vector_type &src, return_value_policy policy, handle parent) {
+        list l(src.size());
         size_t index = 0;
         for (auto const &value: src) {
-            PyObject *value_ = value_conv::cast(value, policy, parent);
-            if (!value_) {
-                Py_DECREF(list);
-                return nullptr;
-            }
-            PyList_SetItem(list, index++, value_);
+            object value_ = object(value_conv::cast(value, policy, parent), false);
+            if (!value_)
+                return handle();
+            PyList_SET_ITEM(l.ptr(), index++, value_.release().ptr()); // steals a reference
         }
-        return list;
+        return l.release();
     }
-    PYBIND11_TYPE_CASTER(type, detail::descr("list<") + value_conv::name() + detail::descr(">"));
+    PYBIND11_TYPE_CASTER(vector_type, _("list<") + value_conv::name() + _(">"));
 };
 
-template <typename Value, typename Compare, typename Alloc> struct type_caster<std::set<Value, Compare, Alloc>> {
-    typedef std::set<Value, Compare, Alloc> type;
-    typedef type_caster<Value> value_conv;
+template <typename Type, size_t Size> struct type_caster<std::array<Type, Size>> {
+    typedef std::array<Type, Size> array_type;
+    typedef type_caster<Type> value_conv;
 public:
-    bool load(PyObject *src, bool convert) {
+    bool load(handle src, bool convert) {
+        list l(src, true);
+        if (!l.check())
+            return false;
+        if (l.size() != Size)
+            return false;
+        value_conv conv;
+        size_t ctr = 0;
+        for (auto it : l) {
+            if (!conv.load(it, convert))
+                return false;
+            value[ctr++] = (Type) conv;
+        }
+        return true;
+    }
+
+    static handle cast(const array_type &src, return_value_policy policy, handle parent) {
+        list l(Size);
+        size_t index = 0;
+        for (auto const &value: src) {
+            object value_ = object(value_conv::cast(value, policy, parent), false);
+            if (!value_)
+                return handle();
+            PyList_SET_ITEM(l.ptr(), index++, value_.release().ptr()); // steals a reference
+        }
+        return l.release();
+    }
+    PYBIND11_TYPE_CASTER(array_type, _("list<") + value_conv::name() + _(">") + _("[") + _<Size>() + _("]"));
+};
+
+template <typename Key, typename Compare, typename Alloc> struct type_caster<std::set<Key, Compare, Alloc>> {
+    typedef std::set<Key, Compare, Alloc> type;
+    typedef type_caster<Key> key_conv;
+public:
+    bool load(handle src, bool convert) {
         pybind11::set s(src, true);
         if (!s.check())
             return false;
         value.clear();
-        value_conv conv;
-        for (const object &o: s) {
-            if (!conv.load((PyObject *) o.ptr(), convert))
+        key_conv conv;
+        for (auto entry : s) {
+            if (!conv.load(entry, convert))
                 return false;
-            value.insert((Value) conv);
+            value.insert((Key) conv);
         }
         return true;
     }
 
-    static PyObject *cast(const type &src, return_value_policy policy, PyObject *parent) {
-        PyObject *set = PySet_New(nullptr);
+    static handle cast(const type &src, return_value_policy policy, handle parent) {
+        pybind11::set s;
         for (auto const &value: src) {
-            PyObject *value_ = value_conv::cast(value, policy, parent);
-            if (!value_) {
-                Py_DECREF(set);
-                return nullptr;
-            }
-            if (PySet_Add(set, value) != 0) {
-                Py_DECREF(value);
-                Py_DECREF(set);
-                return nullptr;
-            }
+            object value_ = object(key_conv::cast(value, policy, parent), false);
+            if (!value_ || !s.add(value_))
+                return handle();
         }
-        return set;
+        return s.release();
     }
-    PYBIND11_TYPE_CASTER(type, detail::descr("set<") + value_conv::name() + detail::descr(">"));
+    PYBIND11_TYPE_CASTER(type, _("set<") + key_conv::name() + _(">"));
 };
 
 template <typename Key, typename Value, typename Compare, typename Alloc> struct type_caster<std::map<Key, Value, Compare, Alloc>> {
@@ -101,46 +125,43 @@ public:
     typedef type_caster<Key>   key_conv;
     typedef type_caster<Value> value_conv;
 
-    bool load(PyObject *src, bool convert) {
-        if (!PyDict_Check(src))
+    bool load(handle src, bool convert) {
+        dict d(src, true);
+        if (!d.check())
             return false;
-
-        value.clear();
-        PyObject *key_, *value_;
-        ssize_t pos = 0;
         key_conv kconv;
         value_conv vconv;
-        while (PyDict_Next(src, &pos, &key_, &value_)) {
-            if (!kconv.load(key_, convert) || !vconv.load(value_, convert))
+        value.clear();
+        for (auto it : d) {
+            if (!kconv.load(it.first.ptr(), convert) ||
+                !vconv.load(it.second.ptr(), convert))
                 return false;
-            value[kconv] = vconv;
+            value[(Key) kconv] = (Value) vconv;
         }
         return true;
     }
 
-    static PyObject *cast(const type &src, return_value_policy policy, PyObject *parent) {
-        PyObject *dict = PyDict_New();
+    static handle cast(const type &src, return_value_policy policy, handle parent) {
+        dict d;
         for (auto const &kv: src) {
-            PyObject *key   = key_conv::cast(kv.first, policy, parent);
-            PyObject *value = value_conv::cast(kv.second, policy, parent);
-            if (!key || !value || PyDict_SetItem(dict, key, value) < 0) {
-                Py_XDECREF(key);
-                Py_XDECREF(value);
-                Py_DECREF(dict);
-                return nullptr;
-            }
-            Py_DECREF(key);
-            Py_DECREF(value);
+            object key = object(key_conv::cast(kv.first, policy, parent), false);
+            object value = object(value_conv::cast(kv.second, policy, parent), false);
+            if (!key || !value)
+                return handle();
+            d[key] = value;
         }
-        return dict;
+        return d.release();
     }
 
-    PYBIND11_TYPE_CASTER(type, detail::descr("dict<") + key_conv::name() + detail::descr(", ") + value_conv::name() + detail::descr(">"));
+    PYBIND11_TYPE_CASTER(type, _("dict<") + key_conv::name() + _(", ") + value_conv::name() + _(">"));
 };
 
 NAMESPACE_END(detail)
 
-inline std::ostream &operator<<(std::ostream &os, const object &obj) { os << (const char *) obj.str(); return os; }
+inline std::ostream &operator<<(std::ostream &os, const handle &obj) {
+    os << (std::string) obj.str();
+    return os;
+}
 
 NAMESPACE_END(pybind11)
 

@@ -1,7 +1,7 @@
 /*
 * @Date:   2015-12-15 17:02:23
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2015-12-16 23:52:21
+* @Last Modified time: 2016-02-10 22:48:02
 *
 * Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 * All rights reserved.
@@ -13,7 +13,7 @@
 
 template <typename TypeValue>
 void _init_array(py::module &m, const char* name) {
-    py::class_<Array<TypeValue>> ary(m, "Array");
+    py::class_<Array<TypeValue>> ary(m, name);
 
     ary.def(py::init<size_t>())
         /// Construct from a buffer

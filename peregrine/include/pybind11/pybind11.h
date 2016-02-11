@@ -1,5 +1,6 @@
 /*
-    pybind11/pybind11.h: Main header file of the C++11 python binding generator library
+    pybind11/pybind11.h: Main header file of the C++11 python
+    binding generator library
 
     Copyright (c) 2015 Wenzel Jakob <wenzel@inf.ethz.ch>
 
@@ -10,310 +11,428 @@
 #pragma once
 
 #if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable: 4127) // warning C4127: Conditional expression is constant
-#pragma warning(disable: 4800) // warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
-#pragma warning(disable: 4996) // warning C4996: The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name
-#pragma warning(disable: 4100) // warning C4100: Unreferenced formal parameter
-#pragma warning(disable: 4512) // warning C4512: Assignment operator was implicitly defined as deleted
+#  pragma warning(push)
+#  pragma warning(disable: 4127) // warning C4127: Conditional expression is constant
+#  pragma warning(disable: 4800) // warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
+#  pragma warning(disable: 4996) // warning C4996: The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name
+#  pragma warning(disable: 4100) // warning C4100: Unreferenced formal parameter
+#  pragma warning(disable: 4512) // warning C4512: Assignment operator was implicitly defined as deleted
 #elif defined(__GNUG__) and !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-parameter"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wunused-but-set-parameter"
+#  pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-#include "cast.h"
+#include "attr.h"
 
 NAMESPACE_BEGIN(pybind11)
 
-template <typename T> struct arg_t;
-
-/// Annotation for keyword arguments
-struct arg {
-    arg(const char *name) : name(name) { }
-    template <typename T> arg_t<T> operator=(const T &value);
-    const char *name;
-};
-
-/// Annotation for keyword arguments with default values
-template <typename T> struct arg_t : public arg {
-    arg_t(const char *name, const T &value) : arg(name), value(value) { }
-    T value;
-};
-template <typename T> arg_t<T> arg::operator=(const T &value) { return arg_t<T>(name, value); }
-
-/// Annotation for methods
-struct is_method { PyObject *class_; is_method(object *o) : class_(o->ptr()) { } };
-
-/// Annotation for documentation
-struct doc { const char *value; doc(const char *value) : value(value) { } };
-
-/// Annotation for function names
-struct name { const char *value; name(const char *value) : value(value) { } };
-
-/// Annotation for function siblings
-struct sibling { PyObject *value; sibling(handle value) : value(value.ptr()) { } };
-
 /// Wraps an arbitrary C++ function/method/lambda function/.. into a callable Python object
 class cpp_function : public function {
-private:
-    /// Chained list of function entries for overloading
-    struct function_entry {
-        const char *name = nullptr;
-        PyObject * (*impl) (function_entry *, PyObject *, PyObject *, PyObject *) = nullptr;
-        PyMethodDef *def = nullptr;
-        void *data = nullptr;
-        void (*free) (void *ptr) = nullptr;
-        bool is_constructor = false, is_method = false;
-        short keywords = 0;
-        return_value_policy policy = return_value_policy::automatic;
-        std::string signature;
-        PyObject *class_ = nullptr;
-        PyObject *sibling = nullptr;
-        const char *doc = nullptr;
-        function_entry *next = nullptr;
-    };
-
-    function_entry *m_entry;
-
+protected:
     /// Picks a suitable return value converter from cast.h
     template <typename T> using return_value_caster =
         detail::type_caster<typename std::conditional<
-            std::is_void<T>::value, detail::void_type, typename detail::decay<T>::type>::type>;
+            std::is_void<T>::value, detail::void_type, typename detail::intrinsic_type<T>::type>::type>;
 
     /// Picks a suitable argument value converter from cast.h
     template <typename... T> using arg_value_caster =
         detail::type_caster<typename std::tuple<T...>>;
-
-    template <typename... T> static void process_extras(const std::tuple<T...> &args,
-            function_entry *entry, const char **kw, const char **def) {
-        process_extras(args, entry, kw, def, typename detail::make_index_sequence<sizeof...(T)>::type());
-    }
-
-    template <typename... T, size_t ... Index> static void process_extras(const std::tuple<T...> &args,
-            function_entry *entry, const char **kw, const char **def, detail::index_sequence<Index...>) {
-        int unused[] = { 0, (process_extra(std::get<Index>(args), entry, kw, def), 0)... };
-        (void) unused;
-    }
-
-    template <typename... T> static void process_extras(const std::tuple<T...> &args,
-            PyObject *pyArgs, PyObject *kwargs, bool is_method) {
-        process_extras(args, pyArgs, kwargs, is_method, typename detail::make_index_sequence<sizeof...(T)>::type());
-    }
-
-    template <typename... T, size_t... Index> static void process_extras(const std::tuple<T...> &args,
-            PyObject *pyArgs, PyObject *kwargs, bool is_method, detail::index_sequence<Index...>) {
-        int index = is_method ? 1 : 0;
-        int unused[] = { 0, (process_extra(std::get<Index>(args), index, pyArgs, kwargs), 0)... };
-        (void) unused; (void) index;
-    }
-
-    static void process_extra(const char *doc, function_entry *entry, const char **, const char **) { entry->doc = doc; }
-    static void process_extra(const pybind11::doc &d, function_entry *entry, const char **, const char **) { entry->doc = d.value; }
-    static void process_extra(const pybind11::name &n, function_entry *entry, const char **, const char **) { entry->name = n.value; }
-    static void process_extra(const pybind11::arg &a, function_entry *entry, const char **kw, const char **) {
-        if (entry->is_method && entry->keywords == 0)
-            kw[entry->keywords++] = "self";
-        kw[entry->keywords++] = a.name;
-    }
-
-    template <typename T>
-    static void process_extra(const pybind11::arg_t<T> &a, function_entry *entry, const char **kw, const char **def) {
-        if (entry->is_method && entry->keywords == 0)
-            kw[entry->keywords++] = "self";
-        kw[entry->keywords] = a.name;
-        def[entry->keywords++] = strdup(detail::to_string(a.value).c_str());
-    }
-
-    static void process_extra(const pybind11::is_method &m, function_entry *entry, const char **, const char **) {
-        entry->is_method = true;
-        entry->class_ = m.class_;
-    }
-    static void process_extra(const pybind11::return_value_policy p, function_entry *entry, const char **, const char **) { entry->policy = p; }
-    static void process_extra(pybind11::sibling s, function_entry *entry, const char **, const char **) { entry->sibling = s.value; }
-
-    template <typename T> static void process_extra(T, int &, PyObject *, PyObject *) { }
-    static void process_extra(const pybind11::arg &a, int &index, PyObject *args, PyObject *kwargs) {
-        if (kwargs) {
-            if (PyTuple_GET_ITEM(args, index) != nullptr) {
-                index++;
-                return;
-            }
-            PyObject *value = PyDict_GetItemString(kwargs, a.name);
-            if (value) {
-                Py_INCREF(value);
-                PyTuple_SetItem(args, index, value);
-            }
-        }
-        index++;
-    }
-    template <typename T>
-    static void process_extra(const pybind11::arg_t<T> &a, int &index, PyObject *args, PyObject *kwargs) {
-        if (PyTuple_GET_ITEM(args, index) != nullptr) {
-            index++;
-            return;
-        }
-        PyObject *value = nullptr;
-        if (kwargs)
-            value = PyDict_GetItemString(kwargs, a.name);
-        if (value) {
-            Py_INCREF(value);
-        } else {
-            value = detail::type_caster<typename detail::decay<T>::type>::cast(
-                a.value, return_value_policy::automatic, nullptr);
-        }
-        PyTuple_SetItem(args, index, value);
-        index++;
-    }
 public:
     cpp_function() { }
 
     /// Vanilla function pointers
-    template <typename Return, typename... Arg, typename... Extra>
-    cpp_function(Return (*f)(Arg...), Extra&&... extra) {
-        struct capture {
-            Return (*f)(Arg...);
-            std::tuple<Extra...> extras;
-        };
+    template <typename Return, typename... Args, typename... Extra>
+    cpp_function(Return (*f)(Args...), const Extra&... extra) {
+        auto rec = new detail::function_record();
+        rec->data = (void *) f;
 
-        m_entry = new function_entry();
-        m_entry->data = new capture { f, std::tuple<Extra...>(std::forward<Extra>(extra)...) };
-
-        typedef arg_value_caster<Arg...> cast_in;
+        typedef arg_value_caster<Args...> cast_in;
         typedef return_value_caster<Return> cast_out;
 
-        m_entry->impl = [](function_entry *entry, PyObject *pyArgs, PyObject *kwargs, PyObject *parent) -> PyObject * {
-            capture *data = (capture *) entry->data;
-            process_extras(data->extras, pyArgs, kwargs, entry->is_method);
+        /* Dispatch code which converts function arguments and performs the actual function call */
+        rec->impl = [](detail::function_record *rec, handle pyArgs, handle parent) -> handle {
             cast_in args;
+
+            /* Try to cast the function arguments into the C++ domain */
             if (!args.load(pyArgs, true))
-                return (PyObject *) 1; /* Special return code: try next overload */
-            return cast_out::cast(args.template call<Return>(data->f), entry->policy, parent);
+                return PYBIND11_TRY_NEXT_OVERLOAD;
+
+            /* Invoke call policy pre-call hook */
+            detail::process_attributes<Extra...>::precall(pyArgs);
+
+            /* Do the call and convert the return value back into the Python domain */
+            handle result = cast_out::cast(
+                args.template call<Return>((Return (*) (Args...)) rec->data),
+                rec->policy, parent);
+
+            /* Invoke call policy post-call hook */
+            detail::process_attributes<Extra...>::postcall(pyArgs, result);
+
+            return result;
         };
 
-        const int N = sizeof...(Extra) > sizeof...(Arg) ? sizeof...(Extra) : sizeof...(Arg);
-        std::array<const char *, N> kw{}, def{};
-        process_extras(((capture *) m_entry->data)->extras, m_entry, kw.data(), def.data());
+        /* Process any user-provided function attributes */
+        detail::process_attributes<Extra...>::init(extra..., rec);
 
-        detail::descr d = cast_in::name(kw.data(), def.data());
-        d += " -> ";
-        d += std::move(cast_out::name());
+        /* Generate a readable signature describing the function's arguments and return value types */
+        using detail::descr;
+        PYBIND11_DESCR signature = cast_in::name() + detail::_(" -> ") + cast_out::name();
 
-        initialize(d, sizeof...(Arg));
+        /* Register the function with Python from generic (non-templated) code */
+        initialize(rec, signature.text(), signature.types(), sizeof...(Args));
     }
 
     /// Delegating helper constructor to deal with lambda functions
-    template <typename Func, typename... Extra> cpp_function(Func &&f, Extra&&... extra) {
+    template <typename Func, typename... Extra> cpp_function(Func &&f, const Extra&... extra) {
         initialize(std::forward<Func>(f),
                    (typename detail::remove_class<decltype(
-                       &std::remove_reference<Func>::type::operator())>::type *) nullptr,
-                   std::forward<Extra>(extra)...);
+                       &std::remove_reference<Func>::type::operator())>::type *) nullptr, extra...);
     }
 
-    /// Class methods (non-const)
+    /// Delegating helper constructor to deal with class methods (non-const)
     template <typename Return, typename Class, typename... Arg, typename... Extra> cpp_function(
-            Return (Class::*f)(Arg...), Extra&&... extra) {
+            Return (Class::*f)(Arg...), const Extra&... extra) {
         initialize([f](Class *c, Arg... args) -> Return { return (c->*f)(args...); },
-                   (Return (*) (Class *, Arg...)) nullptr, std::forward<Extra>(extra)...);
+                   (Return (*) (Class *, Arg...)) nullptr, extra...);
     }
 
-    /// Class methods (const)
+    /// Delegating helper constructor to deal with class methods (const)
     template <typename Return, typename Class, typename... Arg, typename... Extra> cpp_function(
-            Return (Class::*f)(Arg...) const, Extra&&... extra) {
+            Return (Class::*f)(Arg...) const, const Extra&... extra) {
         initialize([f](const Class *c, Arg... args) -> Return { return (c->*f)(args...); },
-                   (Return (*)(const Class *, Arg ...)) nullptr, std::forward<Extra>(extra)...);
+                   (Return (*)(const Class *, Arg ...)) nullptr, extra...);
     }
 
     /// Return the function name
-    const char *name() const { return m_entry->name; }
+    object name() const { return attr("__name__"); }
 
-private:
-    /// Functors, lambda functions, etc.
-    template <typename Func, typename Return, typename... Arg, typename... Extra>
-    void initialize(Func &&f, Return (*)(Arg...), Extra&&... extra) {
-        struct capture {
-            typename std::remove_reference<Func>::type f;
-            std::tuple<Extra...> extras;
-        };
+protected:
+    /// Special internal constructor for functors, lambda functions, etc.
+    template <typename Func, typename Return, typename... Args, typename... Extra>
+    void initialize(Func &&f, Return (*)(Args...), const Extra&... extra) {
+        struct capture { typename std::remove_reference<Func>::type f; };
 
-        m_entry = new function_entry();
-        m_entry->data = new capture { std::forward<Func>(f), std::tuple<Extra...>(std::forward<Extra>(extra)...) };
+        /* Store the function including any extra state it might have (e.g. a lambda capture object) */
+        auto rec = new detail::function_record();
+        rec->data = new capture { std::forward<Func>(f) };
 
+        /* Create a cleanup handler, but only if we have to (less generated code) */
         if (!std::is_trivially_destructible<Func>::value)
-            m_entry->free = [](void *ptr) { delete (capture *) ptr; };
+            rec->free_data = [](void *ptr) { delete (capture *) ptr; };
+        else
+            rec->free_data = operator delete;
 
-        typedef arg_value_caster<Arg...> cast_in;
+        typedef arg_value_caster<Args...> cast_in;
         typedef return_value_caster<Return> cast_out;
 
-        m_entry->impl = [](function_entry *entry, PyObject *pyArgs, PyObject *kwargs, PyObject *parent) -> PyObject *{
-            capture *data = (capture *) entry->data;
-            process_extras(data->extras, pyArgs, kwargs, entry->is_method);
+        /* Dispatch code which converts function arguments and performs the actual function call */
+        rec->impl = [](detail::function_record *rec, handle pyArgs, handle parent) -> handle {
             cast_in args;
+
+            /* Try to cast the function arguments into the C++ domain */
             if (!args.load(pyArgs, true))
-                return (PyObject *) 1; /* Special return code: try next overload */
-            return cast_out::cast(args.template call<Return>(data->f), entry->policy, parent);
+                return PYBIND11_TRY_NEXT_OVERLOAD;
+
+            /* Invoke call policy pre-call hook */
+            detail::process_attributes<Extra...>::precall(pyArgs);
+
+            /* Do the call and convert the return value back into the Python domain */
+            handle result = cast_out::cast(
+                args.template call<Return>(((capture *) rec->data)->f),
+                rec->policy, parent);
+
+            /* Invoke call policy post-call hook */
+            detail::process_attributes<Extra...>::postcall(pyArgs, result);
+
+            return result;
         };
 
-        const int N = sizeof...(Extra) > sizeof...(Arg) ? sizeof...(Extra) : sizeof...(Arg);
-        std::array<const char *, N> kw{}, def{};
-        process_extras(((capture *) m_entry->data)->extras, m_entry, kw.data(), def.data());
+        /* Process any user-provided function attributes */
+        detail::process_attributes<Extra...>::init(extra..., rec);
 
-        detail::descr d = cast_in::name(kw.data(), def.data());
-        d += " -> ";
-        d += std::move(cast_out::name());
+        /* Generate a readable signature describing the function's arguments and return value types */
+        using detail::descr;
+        PYBIND11_DESCR signature = cast_in::name() + detail::_(" -> ") + cast_out::name();
 
-        initialize(d, sizeof...(Arg));
+        /* Register the function with Python from generic (non-templated) code */
+        initialize(rec, signature.text(), signature.types(), sizeof...(Args));
     }
 
+    /// Register a function call with Python (generic non-templated code goes here)
+    void initialize(detail::function_record *rec, const char *text,
+                    const std::type_info *const *types, int args) {
+
+        /* Create copies of all referenced C-style strings */
+        rec->name = strdup(rec->name ? rec->name : "");
+        if (rec->doc) rec->doc = strdup(rec->doc);
+        for (auto &a: rec->args) {
+            if (a.name)
+                a.name = strdup(a.name);
+            if (a.descr)
+                a.descr = strdup(a.descr);
+            else if (a.value)
+                a.descr = strdup(((std::string) ((object) handle(a.value).attr("__repr__")).call().str()).c_str());
+        }
+        auto const &registered_types = detail::get_internals().registered_types_cpp;
+
+        /* Generate a proper function signature */
+        std::string signature;
+        size_t type_depth = 0, char_index = 0, type_index = 0, arg_index = 0;
+        while (true) {
+            char c = text[char_index++];
+            if (c == '\0')
+                break;
+
+            if (c == '{') {
+                if (type_depth == 1 && arg_index < rec->args.size()) {
+                    signature += rec->args[arg_index].name;
+                    signature += " : ";
+                }
+                ++type_depth;
+            } else if (c == '}') {
+                --type_depth;
+                if (type_depth == 1 && arg_index < rec->args.size()) {
+                    if (rec->args[arg_index].descr) {
+                        signature += " = ";
+                        signature += rec->args[arg_index].descr;
+                    }
+                    arg_index++;
+                }
+            } else if (c == '%') {
+                const std::type_info *t = types[type_index++];
+                if (!t)
+                    pybind11_fail("Internal error while parsing type signature (1)");
+                auto it = registered_types.find(std::type_index(*t));
+                if (it != registered_types.end()) {
+                    signature += ((const detail::type_info *) it->second)->type->tp_name;
+                } else {
+                    std::string tname(t->name());
+                    detail::clean_type_id(tname);
+                    signature += tname;
+                }
+            } else {
+                signature += c;
+            }
+        }
+        if (type_depth != 0 || types[type_index] != nullptr)
+            pybind11_fail("Internal error while parsing type signature (2)");
+
+        #if !defined(PYBIND11_CPP14)
+            delete[] types;
+            delete[] text;
+        #endif
+
+#if PY_MAJOR_VERSION < 3
+        if (strcmp(rec->name, "__next__") == 0) {
+            std::free(rec->name);
+            rec->name = strdup("next");
+        }
+#endif
+
+        if (!rec->args.empty() && (int) rec->args.size() != args)
+            pybind11_fail(
+                "cpp_function(): function \"" + std::string(rec->name) + "\" takes " +
+                std::to_string(args) + " arguments, but " + std::to_string(rec->args.size()) +
+                " pybind11::arg entries were specified!");
+
+        rec->is_constructor = !strcmp(rec->name, "__init__");
+        rec->signature = strdup(signature.c_str());
+        rec->args.shrink_to_fit();
+
+#if PY_MAJOR_VERSION < 3
+        if (rec->sibling && PyMethod_Check(rec->sibling.ptr()))
+            rec->sibling = PyMethod_GET_FUNCTION(rec->sibling.ptr());
+#endif
+
+        detail::function_record *chain = nullptr, *chain_start = rec;
+        if (rec->sibling && PyCFunction_Check(rec->sibling.ptr())) {
+            capsule rec_capsule(PyCFunction_GetSelf(rec->sibling.ptr()), true);
+            chain = (detail::function_record *) rec_capsule;
+            /* Never append a method to an overload chain of a parent class;
+               instead, hide the parent's overloads in this case */
+            if (chain->class_ != rec->class_)
+                chain = nullptr;
+        }
+
+        if (!chain) {
+            /* No existing overload was found, create a new function object */
+            rec->def = new PyMethodDef();
+            memset(rec->def, 0, sizeof(PyMethodDef));
+            rec->def->ml_name = rec->name;
+            rec->def->ml_meth = reinterpret_cast<PyCFunction>(*dispatcher);
+            rec->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
+
+            capsule rec_capsule(rec, [](PyObject *o) {
+                destruct((detail::function_record *) PyCapsule_GetPointer(o, nullptr));
+            });
+
+            object scope_module;
+            if (rec->scope) {
+                scope_module = (object) rec->scope.attr("__module__");
+                if (!scope_module)
+                    scope_module = (object) rec->scope.attr("__name__");
+            }
+
+            m_ptr = PyCFunction_NewEx(rec->def, rec_capsule.ptr(), scope_module.ptr());
+            if (!m_ptr)
+                pybind11_fail("cpp_function::cpp_function(): Could not allocate function object");
+        } else {
+            /* Append at the end of the overload chain */
+            m_ptr = rec->sibling.ptr();
+            inc_ref();
+            chain_start = chain;
+            while (chain->next)
+                chain = chain->next;
+            chain->next = rec;
+        }
+
+        std::string signatures;
+        int index = 0;
+        /* Create a nice pydoc rec including all signatures and
+           docstrings of the functions in the overload chain */
+        for (auto it = chain_start; it != nullptr; it = it->next) {
+            if (chain)
+                signatures += std::to_string(++index) + ". ";
+            signatures += "Signature : ";
+            signatures += it->signature;
+            signatures += "\n";
+            if (it->doc && strlen(it->doc) > 0) {
+                signatures += "\n";
+                signatures += it->doc;
+                signatures += "\n";
+            }
+            if (it->next)
+                signatures += "\n";
+        }
+
+        /* Install docstring */
+        PyCFunctionObject *func = (PyCFunctionObject *) m_ptr;
+        if (func->m_ml->ml_doc)
+            std::free((char *) func->m_ml->ml_doc);
+        func->m_ml->ml_doc = strdup(signatures.c_str());
+
+        if (rec->class_) {
+            m_ptr = PYBIND11_INSTANCE_METHOD_NEW(m_ptr, rec->class_.ptr());
+            if (!m_ptr)
+                pybind11_fail("cpp_function::cpp_function(): Could not allocate instance method object");
+            Py_DECREF(func);
+        }
+    }
+
+    /// When a cpp_function is GCed, release any memory allocated by pybind11
+    static void destruct(detail::function_record *rec) {
+        while (rec) {
+            detail::function_record *next = rec->next;
+            if (rec->free_data)
+                rec->free_data(rec->data);
+            std::free((char *) rec->name);
+            std::free((char *) rec->doc);
+            std::free((char *) rec->signature);
+            for (auto &arg: rec->args) {
+                std::free((char *) arg.name);
+                std::free((char *) arg.descr);
+                arg.value.dec_ref();
+            }
+            if (rec->def) {
+                std::free((char *) rec->def->ml_doc);
+                delete rec->def;
+            }
+            delete rec;
+            rec = next;
+        }
+    }
+
+    /// Main dispatch logic for calls to functions bound using pybind11
     static PyObject *dispatcher(PyObject *self, PyObject *args, PyObject *kwargs) {
-        function_entry *overloads = (function_entry *) PyCapsule_GetPointer(self, nullptr);
-        int nargs = (int) PyTuple_Size(args);
-        PyObject *result = nullptr;
-        PyObject *parent = nargs > 0 ? PyTuple_GetItem(args, 0) : nullptr;
-        function_entry *it = overloads;
+        /* Iterator over the list of potentially admissible overloads */
+        detail::function_record *overloads = (detail::function_record *) PyCapsule_GetPointer(self, nullptr),
+                                *it = overloads;
+
+        /* Need to know how many arguments + keyword arguments there are to pick the right overload */
+        int nargs = (int) PyTuple_Size(args),
+            nkwargs = kwargs ? (int) PyDict_Size(kwargs) : 0;
+
+        handle parent = nargs > 0 ? PyTuple_GetItem(args, 0) : nullptr,
+               result = PYBIND11_TRY_NEXT_OVERLOAD;
         try {
             for (; it != nullptr; it = it->next) {
-                PyObject *args_ = args;
+                tuple args_(args, true);
+                int kwargs_consumed = 0;
 
-                if (it->keywords != 0 && nargs < it->keywords) {
-                    args_ = PyTuple_New(it->keywords);
-                    for (int i=0; i<nargs; ++i) {
-                        PyObject *item = PyTuple_GET_ITEM(args, i);
-                        Py_INCREF(item);
-                        PyTuple_SET_ITEM(args_, i, item);
+                /* For each overload:
+                   1. If the required list of arguments is longer than the
+                      actually provided amount, create a copy of the argument
+                      list and fill in any available keyword/default arguments.
+                   2. Ensure that all keyword arguments were "consumed"
+                   3. Call the function call dispatcher (function_record::impl)
+                 */
+
+                if (nargs < (int) it->args.size()) {
+                    args_ = tuple(it->args.size());
+                    for (int i = 0; i < nargs; ++i) {
+                        handle item = PyTuple_GET_ITEM(args, i);
+                        PyTuple_SET_ITEM(args_.ptr(), i, item.inc_ref().ptr());
+                    }
+
+                    int arg_ctr = 0;
+                    for (auto const &it2 : it->args) {
+                        int index = arg_ctr++;
+                        if (PyTuple_GET_ITEM(args_.ptr(), index))
+                            continue;
+
+                        handle value;
+                        if (kwargs)
+                            value = PyDict_GetItemString(kwargs, it2.name);
+
+                        if (value)
+                            kwargs_consumed++;
+                        else if (it2.value)
+                            value = it2.value;
+
+                        if (value) {
+                            PyTuple_SET_ITEM(args_.ptr(), index, value.inc_ref().ptr());
+                        } else {
+                            kwargs_consumed = -1; /* definite failure */
+                            break;
+                        }
                     }
                 }
 
-                result = it->impl(it, args_, kwargs, parent);
+                if (kwargs_consumed == nkwargs)
+                    result = it->impl(it, args_, parent);
 
-                if (args_ != args) {
-                    Py_DECREF(args_);
-                }
-
-                if (result != (PyObject *) 1)
+                if (result.ptr() != PYBIND11_TRY_NEXT_OVERLOAD)
                     break;
             }
-        } catch (const error_already_set &) {                                               return nullptr;
-        } catch (const index_error &e)    { PyErr_SetString(PyExc_IndexError,    e.what()); return nullptr;
-        } catch (const stop_iteration &e) { PyErr_SetString(PyExc_StopIteration, e.what()); return nullptr;
-        } catch (const std::exception &e) { PyErr_SetString(PyExc_RuntimeError,  e.what()); return nullptr;
+        } catch (const error_already_set &)      {                                                 return nullptr;
+        } catch (const index_error &e)           { PyErr_SetString(PyExc_IndexError,    e.what()); return nullptr;
+        } catch (const stop_iteration &e)        { PyErr_SetString(PyExc_StopIteration, e.what()); return nullptr;
+        } catch (const std::bad_alloc &e)        { PyErr_SetString(PyExc_MemoryError,   e.what()); return nullptr;
+        } catch (const std::domain_error &e)     { PyErr_SetString(PyExc_ValueError,    e.what()); return nullptr;
+        } catch (const std::invalid_argument &e) { PyErr_SetString(PyExc_ValueError,    e.what()); return nullptr;
+        } catch (const std::length_error &e)     { PyErr_SetString(PyExc_ValueError,    e.what()); return nullptr;
+        } catch (const std::out_of_range &e)     { PyErr_SetString(PyExc_IndexError,    e.what()); return nullptr;
+        } catch (const std::range_error &e)      { PyErr_SetString(PyExc_ValueError,    e.what()); return nullptr;
+        } catch (const std::exception &e)        { PyErr_SetString(PyExc_RuntimeError,  e.what()); return nullptr;
         } catch (...) {
             PyErr_SetString(PyExc_RuntimeError, "Caught an unknown exception!");
             return nullptr;
         }
-        if (result == (PyObject *) 1) {
+
+        if (result.ptr() == PYBIND11_TRY_NEXT_OVERLOAD) {
             std::string msg = "Incompatible function arguments. The "
                               "following argument types are supported:\n";
             int ctr = 0;
-            for (function_entry *it2 = overloads; it2 != nullptr; it2 = it2->next) {
+            for (detail::function_record *it2 = overloads; it2 != nullptr; it2 = it2->next) {
                 msg += "    "+ std::to_string(++ctr) + ". ";
                 msg += it2->signature;
                 msg += "\n";
             }
             PyErr_SetString(PyExc_TypeError, msg.c_str());
             return nullptr;
-        } else if (result == nullptr) {
+        } else if (!result) {
             std::string msg = "Unable to convert function return value to a "
                               "Python type! The signature was\n\t";
             msg += it->signature;
@@ -321,109 +440,18 @@ private:
             return nullptr;
         } else {
             if (overloads->is_constructor) {
+                /* When a construtor ran successfully, the corresponding
+                   holder type (e.g. std::unique_ptr) must still be initialized. */
                 PyObject *inst = PyTuple_GetItem(args, 0);
-                const detail::type_info *type_info =
-                    capsule(PyObject_GetAttrString((PyObject *) Py_TYPE(inst),
-                                const_cast<char *>("__pybind11__")), false);
-                type_info->init_holder(inst);
+                auto tinfo = detail::get_type_info(Py_TYPE(inst));
+                tinfo->init_holder(inst, nullptr);
             }
-            return result;
-        }
-    }
-
-    static void destruct(function_entry *entry) {
-        while (entry) {
-            delete entry->def;
-            if (entry->free)
-                entry->free(entry->data);
-            else
-                operator delete(entry->data);
-            function_entry *next = entry->next;
-            delete entry;
-            entry = next;
-        }
-    }
-
-    void initialize(const detail::descr &descr, int args) {
-        if (m_entry->name == nullptr)
-            m_entry->name = "";
-
-#if PY_MAJOR_VERSION < 3
-        if (strcmp(m_entry->name, "__next__") == 0)
-            m_entry->name = "next";
-#endif
-
-        if (m_entry->keywords != 0 && m_entry->keywords != args)
-            throw std::runtime_error(
-                "cpp_function(): function \"" + std::string(m_entry->name) + "\" takes " +
-                std::to_string(args) + " arguments, but " + std::to_string(m_entry->keywords) +
-                " pybind11::arg entries were specified!");
-
-        m_entry->is_constructor = !strcmp(m_entry->name, "__init__");
-        m_entry->signature = descr.str();
-
-#if PY_MAJOR_VERSION < 3
-        if (m_entry->sibling && PyMethod_Check(m_entry->sibling))
-            m_entry->sibling = PyMethod_GET_FUNCTION(m_entry->sibling);
-#endif
-
-        function_entry *s_entry = nullptr, *entry = m_entry;
-        if (m_entry->sibling && PyCFunction_Check(m_entry->sibling)) {
-            capsule entry_capsule(PyCFunction_GetSelf(m_entry->sibling), true);
-            s_entry = (function_entry *) entry_capsule;
-            if (s_entry->class_ != m_entry->class_)
-                s_entry = nullptr; /* Method override */
-        }
-
-        if (!s_entry) {
-            m_entry->def = new PyMethodDef();
-            memset(m_entry->def, 0, sizeof(PyMethodDef));
-            m_entry->def->ml_name = m_entry->name;
-            m_entry->def->ml_meth = reinterpret_cast<PyCFunction>(*dispatcher);
-            m_entry->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
-            capsule entry_capsule(m_entry, [](PyObject *o) { destruct((function_entry *) PyCapsule_GetPointer(o, nullptr)); });
-            m_ptr = PyCFunction_New(m_entry->def, entry_capsule.ptr());
-            if (!m_ptr)
-                throw std::runtime_error("cpp_function::cpp_function(): Could not allocate function object");
-        } else {
-            m_ptr = m_entry->sibling;
-            inc_ref();
-            entry = s_entry;
-            while (s_entry->next)
-                s_entry = s_entry->next;
-            s_entry->next = m_entry;
-        }
-
-        std::string signatures;
-        int index = 0;
-        function_entry *it = entry;
-        while (it) { /* Create pydoc it */
-            if (s_entry)
-                signatures += std::to_string(++index) + ". ";
-            signatures += "Signature : " + std::string(it->signature) + "\n";
-            if (it->doc && strlen(it->doc) > 0)
-                signatures += "\n" + std::string(it->doc) + "\n";
-            if (it->next)
-                signatures += "\n";
-            it = it->next;
-        }
-        PyCFunctionObject *func = (PyCFunctionObject *) m_ptr;
-        if (func->m_ml->ml_doc)
-            std::free((char *) func->m_ml->ml_doc);
-        func->m_ml->ml_doc = strdup(signatures.c_str());
-        if (entry->is_method) {
-#if PY_MAJOR_VERSION >= 3
-            m_ptr = PyInstanceMethod_New(m_ptr);
-#else
-            m_ptr = PyMethod_New(m_ptr, nullptr, entry->class_);
-#endif
-            if (!m_ptr)
-                throw std::runtime_error("cpp_function::cpp_function(): Could not allocate instance method object");
-            Py_DECREF(func);
+            return result.ptr();
         }
     }
 };
 
+/// Wrapper for Python extension modules
 class module : public object {
 public:
     PYBIND11_OBJECT_DEFAULT(module, object, PyModule_Check)
@@ -441,16 +469,16 @@ public:
         m_ptr = Py_InitModule3(name, nullptr, doc);
 #endif
         if (m_ptr == nullptr)
-            throw std::runtime_error("Internal error in module::module()");
+            pybind11_fail("Internal error in module::module()");
         inc_ref();
     }
 
     template <typename Func, typename... Extra>
-    module &def(const char *name_, Func &&f, Extra&& ... extra) {
+    module &def(const char *name_, Func &&f, const Extra& ... extra) {
         cpp_function func(std::forward<Func>(f), name(name_),
-                          sibling((handle) attr(name_)), std::forward<Extra>(extra)...);
-        func.inc_ref(); /* The following line steals a reference to 'func' */
-        PyModule_AddObject(ptr(), name_, func.ptr());
+                          sibling((handle) attr(name_)), scope(*this), extra...);
+        /* PyModule_AddObject steals a reference to 'func' */
+        PyModule_AddObject(ptr(), name_, func.inc_ref().ptr());
         return *this;
     }
 
@@ -465,110 +493,144 @@ public:
     }
 
     static module import(const char *name) {
-        return module(PyImport_ImportModule(name), false);
+        PyObject *obj = PyImport_ImportModule(name);
+        if (!obj)
+            pybind11_fail("Module \"" + std::string(name) + "\" not found!");
+        return module(obj, false);
     }
 };
 
 NAMESPACE_BEGIN(detail)
-/// Basic support for creating new Python heap types
-class custom_type : public object {
+/// Generic support for creating new Python heap types
+class generic_type : public object {
+    template <typename type, typename holder_type> friend class class_;
 public:
-    PYBIND11_OBJECT_DEFAULT(custom_type, object, PyType_Check)
+    PYBIND11_OBJECT_DEFAULT(generic_type, object, PyType_Check)
+protected:
+    void initialize(type_record *rec) {
+        if (rec->base_type) {
+            if (rec->base_handle)
+                pybind11_fail("generic_type: specified base type multiple times!");
+            rec->base_handle = detail::get_type_handle(*(rec->base_type));
+            if (!rec->base_handle) {
+                std::string tname(rec->base_type->name());
+                detail::clean_type_id(tname);
+                pybind11_fail("generic_type: type \"" + std::string(rec->name) +
+                              "\" referenced unknown base type \"" + tname + "\"");
+            }
+        }
 
-    custom_type(object &scope, const char *name_, const std::type_info *tinfo,
-                size_t type_size, size_t instance_size,
-                void (*init_holder)(PyObject *), const destructor &dealloc,
-                PyObject *parent, const char *doc) {
-        PyHeapTypeObject *type = (PyHeapTypeObject*) PyType_Type.tp_alloc(&PyType_Type, 0);
-#if PY_MAJOR_VERSION >= 3
-        PyObject *name = PyUnicode_FromString(name_);
-#else
-        PyObject *name = PyString_FromString(name_);
-#endif
-        if (type == nullptr || name == nullptr)
-            throw std::runtime_error("Internal error in custom_type::custom_type()");
-        Py_INCREF(name);
-        std::string full_name(name_);
+        object type_holder(PyType_Type.tp_alloc(&PyType_Type, 0), false);
+        object name(PYBIND11_FROM_STRING(rec->name), false);
+        auto type = (PyHeapTypeObject*) type_holder.ptr();
 
-        pybind11::str scope_name = (object) scope.attr("__name__"),
-                    module_name = (object) scope.attr("__module__");
+        if (!type_holder || !name)
+            pybind11_fail("generic_type: unable to create type object!");
 
-        if (scope_name.check())
-            full_name =  std::string(scope_name) + "." + full_name;
-        if (module_name.check())
-            full_name =  std::string(module_name) + "." + full_name;
+        /* Register supplemental type information in C++ dict */
+        auto &internals = get_internals();
+        detail::type_info *tinfo = new detail::type_info();
+        tinfo->type = (PyTypeObject *) type;
+        tinfo->type_size = rec->type_size;
+        tinfo->init_holder = rec->init_holder;
+        internals.registered_types_cpp[std::type_index(*(rec->type))] = tinfo;
+        internals.registered_types_py[type] = tinfo;
 
-        type->ht_name = name;
-#if PY_MAJOR_VERSION >= 3
-        type->ht_qualname = name;
-#endif
+        auto scope_module = (object) rec->scope.attr("__module__");
+        if (!scope_module)
+            scope_module = (object) rec->scope.attr("__name__");
+
+        std::string full_name = (scope_module ? ((std::string) scope_module.str() + "." + rec->name)
+                                              : std::string(rec->name));
+        /* Basic type attributes */
         type->ht_type.tp_name = strdup(full_name.c_str());
-        type->ht_type.tp_basicsize = instance_size;
-        type->ht_type.tp_init = (initproc) init;
-        type->ht_type.tp_new = (newfunc) new_instance;
-        type->ht_type.tp_dealloc = dealloc;
-        type->ht_type.tp_flags |=
-            Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HEAPTYPE;
-        type->ht_type.tp_flags &= ~Py_TPFLAGS_HAVE_GC;
-#if PY_MAJOR_VERSION < 3
-        type->ht_type.tp_flags |= Py_TPFLAGS_CHECKTYPES;
+        type->ht_type.tp_basicsize = rec->instance_size;
+        type->ht_type.tp_base = (PyTypeObject *) rec->base_handle.ptr();
+        rec->base_handle.inc_ref();
+
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 3
+        /* Qualified names for Python >= 3.3 */
+        auto scope_qualname = (object) rec->scope.attr("__qualname__");
+        if (scope_qualname) {
+            type->ht_qualname = PyUnicode_FromFormat(
+                "%U.%U", scope_qualname.ptr(), name.ptr());
+        } else {
+            type->ht_qualname = name.ptr();
+            name.inc_ref();
+        }
 #endif
+        type->ht_name = name.release().ptr();
+
+        /* Supported protocols */
         type->ht_type.tp_as_number = &type->as_number;
         type->ht_type.tp_as_sequence = &type->as_sequence;
         type->ht_type.tp_as_mapping = &type->as_mapping;
-        type->ht_type.tp_base = (PyTypeObject *) parent;
-        if (doc) {
-            size_t size = strlen(doc)+1;
-            type->ht_type.tp_doc = (char *)PyObject_MALLOC(size);
-            memcpy((void *) type->ht_type.tp_doc, doc, size);
+
+        /* Supported elementary operations */
+        type->ht_type.tp_init = (initproc) init;
+        type->ht_type.tp_new = (newfunc) new_instance;
+        type->ht_type.tp_dealloc = rec->dealloc;
+
+        /* Support weak references (needed for the keep_alive feature) */
+        type->ht_type.tp_weaklistoffset = offsetof(instance_essentials<void>, weakrefs);
+
+        /* Flags */
+        type->ht_type.tp_flags |= Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HEAPTYPE;
+#if PY_MAJOR_VERSION < 3
+        type->ht_type.tp_flags |= Py_TPFLAGS_CHECKTYPES;
+#endif
+        type->ht_type.tp_flags &= ~Py_TPFLAGS_HAVE_GC;
+
+        if (rec->doc) {
+            /* Allocate memory for docstring (using PyObject_MALLOC, since
+               Python will free this later on) */
+            size_t size = strlen(rec->doc) + 1;
+            type->ht_type.tp_doc = (char *) PyObject_MALLOC(size);
+            memcpy((void *) type->ht_type.tp_doc, rec->doc, size);
         }
-        Py_XINCREF(parent);
 
         if (PyType_Ready(&type->ht_type) < 0)
-            throw std::runtime_error("Internal error in custom_type::custom_type()");
-        m_ptr = (PyObject *) type;
+            pybind11_fail("generic_type: PyType_Ready failed!");
 
-        /* Needed by pydoc */
-        attr("__module__") = scope_name;
+        m_ptr = type_holder.ptr();
 
-        auto &type_info = detail::get_internals().registered_types[tinfo];
-        type_info.type = (PyTypeObject *) m_ptr;
-        type_info.type_size = type_size;
-        type_info.init_holder = init_holder;
-        attr("__pybind11__") = capsule(&type_info);
+        if (scope_module) // Needed by pydoc
+            attr("__module__") = scope_module;
 
-        scope.attr(name) = *this;
+        /* Register type with the parent scope */
+        rec->scope.attr(handle(type->ht_name)) = *this;
+
+        type_holder.release();
     }
 
-protected:
-    /* Allocate a metaclass on demand (for static properties) */
+    /// Allocate a metaclass on demand (for static properties)
     handle metaclass() {
         auto &ht_type = ((PyHeapTypeObject *) m_ptr)->ht_type;
-#if PY_MAJOR_VERSION >= 3
-        auto &ob_type = ht_type.ob_base.ob_base.ob_type;
-#else
-        auto &ob_type = ht_type.ob_type;
-#endif
+        auto &ob_type = PYBIND11_OB_TYPE(ht_type);
 
         if (ob_type == &PyType_Type) {
-            std::string name_ = std::string(ht_type.tp_name) + "_meta";
-            PyHeapTypeObject *type = (PyHeapTypeObject*) PyType_Type.tp_alloc(&PyType_Type, 0);
-            PyObject *name = PyUnicode_FromString(name_.c_str());
-            if (type == nullptr || name == nullptr)
-                throw std::runtime_error("Internal error in custom_type::metaclass()");
-            Py_INCREF(name);
-            type->ht_name = name;
-#if PY_MAJOR_VERSION >= 3
-            type->ht_qualname = name;
+            std::string name_ = std::string(ht_type.tp_name) + "__Meta";
+            object type_holder(PyType_Type.tp_alloc(&PyType_Type, 0), false);
+            object name(PYBIND11_FROM_STRING(name_.c_str()), false);
+            if (!type_holder || !name)
+                pybind11_fail("generic_type::metaclass(): unable to create type object!");
+
+            auto type = (PyHeapTypeObject*) type_holder.ptr();
+            type->ht_name = name.release().ptr();
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 3
+            /* Qualified names for Python >= 3.3 */
+            type->ht_qualname = PyUnicode_FromFormat(
+                "%U__Meta", ((object) attr("__qualname__")).ptr());
 #endif
             type->ht_type.tp_name = strdup(name_.c_str());
-            type->ht_type.tp_base = &PyType_Type;
-            type->ht_type.tp_flags |= Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
-            type->ht_type.tp_flags &= ~Py_TPFLAGS_HAVE_GC;
+            type->ht_type.tp_base = ob_type;
+            type->ht_type.tp_flags |= (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE) &
+                                      ~Py_TPFLAGS_HAVE_GC;
+
             if (PyType_Ready(&type->ht_type) < 0)
-                throw std::runtime_error("Internal error in custom_type::metaclass()");
-            ob_type = (PyTypeObject *) type;
-            Py_INCREF(type);
+                pybind11_fail("generic_type::metaclass(): PyType_Ready failed!");
+
+            ob_type = (PyTypeObject *) type_holder.release().ptr();
         }
         return handle((PyObject *) ob_type);
     }
@@ -580,10 +642,9 @@ protected:
     }
 
     static PyObject *new_instance(PyTypeObject *type, PyObject *, PyObject *) {
-        const detail::type_info *type_info = capsule(
-            PyObject_GetAttrString((PyObject *) type, const_cast<char*>("__pybind11__")), false);
-        instance<void> *self = (instance<void> *) PyType_GenericAlloc(type, 0);
-        self->value = ::operator new(type_info->type_size);
+        instance<void> *self = (instance<void> *) PyType_GenericAlloc((PyTypeObject *) type, 0);
+        auto tinfo = detail::get_type_info(type);
+        self->value = ::operator new(tinfo->type_size);
         self->owned = true;
         self->parent = nullptr;
         self->constructed = false;
@@ -598,10 +659,12 @@ protected:
                 auto &registered_instances = detail::get_internals().registered_instances;
                 auto it = registered_instances.find(self->value);
                 if (it == registered_instances.end())
-                    throw std::runtime_error("Deallocating unregistered instance!");
+                    pybind11_fail("generic_type::dealloc(): Tried to deallocate unregistered instance!");
                 registered_instances.erase(it);
             }
             Py_XDECREF(self->parent);
+            if (self->weakrefs)
+                PyObject_ClearWeakRefs((PyObject *) self);
         }
         Py_TYPE(self)->tp_free((PyObject*) self);
     }
@@ -616,20 +679,19 @@ protected:
 #endif
         type->as_buffer.bf_getbuffer = getbuffer;
         type->as_buffer.bf_releasebuffer = releasebuffer;
-        auto info = ((detail::type_info *) capsule(attr("__pybind11__")));
-        info->get_buffer = get_buffer;
-        info->get_buffer_data = get_buffer_data;
+        auto tinfo = detail::get_type_info(&type->ht_type);
+        tinfo->get_buffer = get_buffer;
+        tinfo->get_buffer_data = get_buffer_data;
     }
 
     static int getbuffer(PyObject *obj, Py_buffer *view, int flags) {
-        auto const &typeinfo = ((detail::type_info *) capsule(handle(obj).attr("__pybind11__")));
-
-        if (view == nullptr || obj == nullptr || !typeinfo || !typeinfo->get_buffer) {
-            PyErr_SetString(PyExc_BufferError, "Internal error");
+        auto tinfo = detail::get_type_info(Py_TYPE(obj));
+        if (view == nullptr || obj == nullptr || !tinfo || !tinfo->get_buffer) {
+            PyErr_SetString(PyExc_BufferError, "generic_type::getbuffer(): Internal error");
             return -1;
         }
         memset(view, 0, sizeof(Py_buffer));
-        buffer_info *info = typeinfo->get_buffer(obj, typeinfo->get_buffer_data);
+        buffer_info *info = tinfo->get_buffer(obj, tinfo->get_buffer_data);
         view->obj = obj;
         view->ndim = 1;
         view->internal = info;
@@ -642,8 +704,8 @@ protected:
             view->format = const_cast<char *>(info->format.c_str());
         if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES) {
             view->ndim = info->ndim;
-            view->strides = (Py_ssize_t *)&info->strides[0];
-            view->shape = (Py_ssize_t *) &info->shape[0];
+            view->strides = (ssize_t *) &info->strides[0];
+            view->shape = (ssize_t *) &info->shape[0];
         }
         Py_INCREF(view->obj);
         return 0;
@@ -651,65 +713,64 @@ protected:
 
     static void releasebuffer(PyObject *, Py_buffer *view) { delete (buffer_info *) view->internal; }
 };
-
-/* Forward declarations */
-enum op_id : int;
-enum op_type : int;
-struct undefined_t;
-template <op_id id, op_type ot, typename L = undefined_t, typename R = undefined_t> struct op_;
-template <typename... Args> struct init;
 NAMESPACE_END(detail)
 
-template <typename type, typename holder_type = std::unique_ptr<type>> class class_ : public detail::custom_type {
+template <typename type, typename holder_type = std::unique_ptr<type>>
+class class_ : public detail::generic_type {
 public:
     typedef detail::instance<type, holder_type> instance_type;
 
-    PYBIND11_OBJECT(class_, detail::custom_type, PyType_Check)
+    PYBIND11_OBJECT(class_, detail::generic_type, PyType_Check)
 
-    class_(object &scope, const char *name, const char *doc = nullptr)
-        : detail::custom_type(scope, name, &typeid(type), sizeof(type),
-                              sizeof(instance_type), init_holder, dealloc,
-                              nullptr, doc) { }
+    template <typename... Extra>
+    class_(handle scope, const char *name, const Extra &... extra) {
+        detail::type_record record;
+        record.scope = scope;
+        record.name = name;
+        record.type = &typeid(type);
+        record.type_size = sizeof(type);
+        record.instance_size = sizeof(instance_type);
+        record.init_holder = init_holder;
+        record.dealloc = dealloc;
 
-    class_(object &scope, const char *name, object &parent,
-           const char *doc = nullptr)
-        : detail::custom_type(scope, name, &typeid(type), sizeof(type),
-                              sizeof(instance_type), init_holder, dealloc,
-                              parent.ptr(), doc) { }
+        /* Process optional arguments, if any */
+        detail::process_attributes<Extra...>::init(extra..., &record);
+
+        detail::generic_type::initialize(&record);
+    }
 
     template <typename Func, typename... Extra>
-    class_ &def(const char *name_, Func&& f, Extra&&... extra) {
+    class_ &def(const char *name_, Func&& f, const Extra&... extra) {
         cpp_function cf(std::forward<Func>(f), name(name_),
-                        sibling(attr(name_)), is_method(this),
-                        std::forward<Extra>(extra)...);
+                        sibling(attr(name_)), is_method(*this),
+                        extra...);
         attr(cf.name()) = cf;
         return *this;
     }
 
     template <typename Func, typename... Extra> class_ &
-    def_static(const char *name_, Func f, Extra&&... extra) {
+    def_static(const char *name_, Func f, const Extra&... extra) {
         cpp_function cf(std::forward<Func>(f), name(name_),
-                        sibling(attr(name_)),
-                        std::forward<Extra>(extra)...);
+                        sibling(attr(name_)), scope(*this), extra...);
         attr(cf.name()) = cf;
         return *this;
     }
 
     template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra>
-    class_ &def(const detail::op_<id, ot, L, R> &op, Extra&&... extra) {
-        op.template execute<type>(*this, std::forward<Extra>(extra)...);
+    class_ &def(const detail::op_<id, ot, L, R> &op, const Extra&... extra) {
+        op.template execute<type>(*this, extra...);
         return *this;
     }
 
     template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra>
-    class_ & def_cast(const detail::op_<id, ot, L, R> &op, Extra&&... extra) {
-        op.template execute_cast<type>(*this, std::forward<Extra>(extra)...);
+    class_ & def_cast(const detail::op_<id, ot, L, R> &op, const Extra&... extra) {
+        op.template execute_cast<type>(*this, extra...);
         return *this;
     }
 
     template <typename... Args, typename... Extra>
-    class_ &def(const detail::init<Args...> &init, Extra&&... extra) {
-        init.template execute<type>(*this, std::forward<Extra>(extra)...);
+    class_ &def(const detail::init<Args...> &init, const Extra&... extra) {
+        init.template execute<type>(*this, extra...);
         return *this;
     }
 
@@ -726,38 +787,38 @@ public:
     }
 
     template <typename C, typename D, typename... Extra>
-    class_ &def_readwrite(const char *name, D C::*pm, Extra&&... extra) {
+    class_ &def_readwrite(const char *name, D C::*pm, const Extra&... extra) {
         cpp_function fget([pm](const C &c) -> const D &{ return c.*pm; },
                           return_value_policy::reference_internal,
-                          is_method(this), extra...),
+                          is_method(*this), extra...),
                      fset([pm](C &c, const D &value) { c.*pm = value; },
-                          is_method(this), extra...);
+                          is_method(*this), extra...);
         def_property(name, fget, fset);
         return *this;
     }
 
     template <typename C, typename D, typename... Extra>
-    class_ &def_readonly(const char *name, const D C::*pm, Extra&& ...extra) {
+    class_ &def_readonly(const char *name, const D C::*pm, const Extra& ...extra) {
         cpp_function fget([pm](const C &c) -> const D &{ return c.*pm; },
                           return_value_policy::reference_internal,
-                          is_method(this), std::forward<Extra>(extra)...);
+                          is_method(*this), extra...);
         def_property_readonly(name, fget);
         return *this;
     }
 
     template <typename D, typename... Extra>
-    class_ &def_readwrite_static(const char *name, D *pm, Extra&& ...extra) {
-        cpp_function fget([pm](object) -> const D &{ return *pm; }, nullptr,
-                          return_value_policy::reference_internal, extra...),
-                     fset([pm](object, const D &value) { *pm = value; }, extra...);
+    class_ &def_readwrite_static(const char *name, D *pm, const Extra& ...extra) {
+        cpp_function fget([pm](object) -> const D &{ return *pm; },
+                          return_value_policy::reference_internal, scope(*this), extra...),
+                     fset([pm](object, const D &value) { *pm = value; }, scope(*this), extra...);
         def_property_static(name, fget, fset);
         return *this;
     }
 
     template <typename D, typename... Extra>
-    class_ &def_readonly_static(const char *name, const D *pm, Extra&& ...extra) {
-        cpp_function fget([pm](object) -> const D &{ return *pm; }, nullptr,
-                          return_value_policy::reference_internal, std::forward<Extra>(extra)...);
+    class_ &def_readonly_static(const char *name, const D *pm, const Extra& ...extra) {
+        cpp_function fget([pm](object) -> const D &{ return *pm; },
+                          return_value_policy::reference_internal, scope(*this), extra...);
         def_property_readonly_static(name, fget);
         return *this;
     }
@@ -773,53 +834,62 @@ public:
     }
 
     class_ &def_property(const char *name, const cpp_function &fget, const cpp_function &fset, const char *doc = nullptr) {
-        object doc_obj = doc ? pybind11::str(doc) : (object) const_cast<cpp_function&>(fget).attr("__doc__");
+        object doc_obj = doc ? pybind11::str(doc) : (object) fget.attr("__doc__");
         object property(
-            PyObject_CallFunction((PyObject *)&PyProperty_Type,
-                                  const_cast<char *>("OOOO"), fget.ptr() ? fget.ptr() : Py_None,
-                                  fset.ptr() ? fset.ptr() : Py_None, Py_None, doc_obj.ptr()), false);
+            PyObject_CallFunctionObjArgs((PyObject *) &PyProperty_Type, fget.ptr() ? fget.ptr() : Py_None,
+                                         fset.ptr() ? fset.ptr() : Py_None, Py_None, doc_obj.ptr(), nullptr), false);
         attr(name) = property;
         return *this;
     }
 
     class_ &def_property_static(const char *name, const cpp_function &fget, const cpp_function &fset, const char *doc = nullptr) {
-        object doc_obj = doc ? pybind11::str(doc) : (object) const_cast<cpp_function&>(fget).attr("__doc__");
+        object doc_obj = doc ? pybind11::str(doc) : (object) fget.attr("__doc__");
         object property(
-            PyObject_CallFunction((PyObject *)&PyProperty_Type,
-                                  const_cast<char *>("OOOs"), fget.ptr() ? fget.ptr() : Py_None,
-                                  fset.ptr() ? fset.ptr() : Py_None, Py_None, doc_obj.ptr()), false);
+            PyObject_CallFunctionObjArgs((PyObject *) &PyProperty_Type, fget.ptr() ? fget.ptr() : Py_None,
+                                         fset.ptr() ? fset.ptr() : Py_None, Py_None, doc_obj.ptr(), nullptr), false);
         metaclass().attr(name) = property;
         return *this;
     }
 
     template <typename target> class_ alias() {
-        auto &instances = pybind11::detail::get_internals().registered_types;
-        instances[&typeid(target)] = instances[&typeid(type)];
+        auto &instances = pybind11::detail::get_internals().registered_types_cpp;
+        instances[std::type_index(typeid(target))] = instances[std::type_index(typeid(type))];
         return *this;
     }
 private:
-    template <typename T = holder_type,
-              typename std::enable_if<!std::is_same<std::shared_ptr<type>, T>::value, int>::type = 0>
-    static void init_holder(PyObject *inst_) {
-        instance_type *inst = (instance_type *) inst_;
-        new (&inst->holder) holder_type(inst->value);
-        inst->constructed = true;
-    }
-
-    template <typename T = holder_type,
-              typename std::enable_if<std::is_same<std::shared_ptr<type>, T>::value, int>::type = 0>
-    static void init_holder(PyObject *inst_) {
-        instance_type *inst = (instance_type *) inst_;
+    /// Initialize holder object, variant 1: object derives from enable_shared_from_this
+    template <typename T>
+    static void init_holder_helper(instance_type *inst, const holder_type * /* unused */, const std::enable_shared_from_this<T> * /* dummy */) {
         try {
-            new (&inst->holder) holder_type(
-                inst->value->shared_from_this()
-            );
+            new (&inst->holder) holder_type(inst->value->shared_from_this());
         } catch (const std::bad_weak_ptr &) {
             new (&inst->holder) holder_type(inst->value);
         }
-        inst->constructed = true;
     }
 
+    /// Initialize holder object, variant 2: try to construct from existing holder object, if possible
+    template <typename T = holder_type,
+              typename std::enable_if<std::is_copy_constructible<T>::value, int>::type = 0>
+    static void init_holder_helper(instance_type *inst, const holder_type *holder_ptr, const void * /* dummy */) {
+        if (holder_ptr)
+            new (&inst->holder) holder_type(*holder_ptr);
+        else
+            new (&inst->holder) holder_type(inst->value);
+    }
+
+    /// Initialize holder object, variant 3: holder is not copy constructible (e.g. unique_ptr), always initialize from raw pointer
+    template <typename T = holder_type,
+              typename std::enable_if<!std::is_copy_constructible<T>::value, int>::type = 0>
+    static void init_holder_helper(instance_type *inst, const holder_type * /* unused */, const void * /* dummy */) {
+        new (&inst->holder) holder_type(inst->value);
+    }
+
+    /// Initialize holder object of an instance, possibly given a pointer to an existing holder
+    static void init_holder(PyObject *inst_, const void *holder_ptr) {
+        auto inst = (instance_type *) inst_;
+        init_holder_helper(inst, (const holder_type *) holder_ptr, inst->value);
+        inst->constructed = true;
+    }
 
     static void dealloc(PyObject *inst_) {
         instance_type *inst = (instance_type *) inst_;
@@ -829,15 +899,16 @@ private:
             else
                 ::operator delete(inst->value);
         }
-        custom_type::dealloc((detail::instance<void> *) inst);
+        generic_type::dealloc((detail::instance<void> *) inst);
     }
 };
 
 /// Binds C++ enumerations and enumeration classes to Python
 template <typename Type> class enum_ : public class_<Type> {
 public:
-    enum_(object &scope, const char *name, const char *doc = nullptr)
-      : class_<Type>(scope, name, doc), m_parent(scope) {
+    template <typename... Extra>
+    enum_(const handle &scope, const char *name, const Extra&... extra)
+      : class_<Type>(scope, name, extra...), m_parent(scope) {
         auto entries = new std::unordered_map<int, const char *>();
         this->def("__repr__", [name, entries](Type value) -> std::string {
             auto it = entries->find((int) value);
@@ -845,7 +916,11 @@ public:
                 ((it == entries->end()) ? std::string("???")
                                         : std::string(it->second));
         });
+        this->def("__init__", [](Type& value, int i) { value = (Type) i; });
         this->def("__int__", [](Type value) { return (int) value; });
+        this->def("__eq__", [](const Type &value, Type value2) { return value == value2; });
+        this->def("__ne__", [](const Type &value, Type value2) { return value != value2; });
+        this->def("__hash__", [](const Type &value) { return (int) value; });
         m_entries = entries;
     }
 
@@ -853,7 +928,7 @@ public:
     void export_values() {
         PyObject *dict = ((PyTypeObject *) this->m_ptr)->tp_dict;
         PyObject *key, *value;
-        Py_ssize_t pos = 0;
+        ssize_t pos = 0;
         while (PyDict_Next(dict, &pos, &key, &value))
             if (PyObject_IsInstance(value, this->m_ptr))
                 m_parent.attr(key) = value;
@@ -867,22 +942,40 @@ public:
     }
 private:
     std::unordered_map<int, const char *> *m_entries;
-    object &m_parent;
+    handle m_parent;
 };
 
 NAMESPACE_BEGIN(detail)
 template <typename... Args> struct init {
-    template <typename Base, typename Holder, typename... Extra> void execute(pybind11::class_<Base, Holder> &class_, Extra&&... extra) const {
+    template <typename Base, typename Holder, typename... Extra> void execute(pybind11::class_<Base, Holder> &class_, const Extra&... extra) const {
         /// Function which calls a specific C++ in-place constructor
-        class_.def("__init__", [](Base *instance, Args... args) { new (instance) Base(args...); }, std::forward<Extra>(extra)...);
+        class_.def("__init__", [](Base *instance, Args... args) { new (instance) Base(args...); }, extra...);
     }
 };
+
+PYBIND11_NOINLINE inline void keep_alive_impl(int Nurse, int Patient, handle args, handle ret) {
+    /* Clever approach based on weak references taken from Boost.Python */
+    handle nurse  (Nurse   > 0 ? PyTuple_GetItem(args.ptr(), Nurse   - 1) : ret.ptr());
+    handle patient(Patient > 0 ? PyTuple_GetItem(args.ptr(), Patient - 1) : ret.ptr());
+
+    if (!nurse || !patient)
+        pybind11_fail("Could not activate keep_alive!");
+
+    cpp_function disable_lifesupport(
+        [patient](handle weakref) { patient.dec_ref(); weakref.dec_ref(); });
+
+    weakref wr(nurse, disable_lifesupport);
+
+    patient.inc_ref(); /* reference patient and leak the weak reference */
+    (void) wr.release();
+}
+
 NAMESPACE_END(detail)
 
 template <typename... Args> detail::init<Args...> init() { return detail::init<Args...>(); };
 
 template <typename InputType, typename OutputType> void implicitly_convertible() {
-    auto implicit_caster = [](PyObject *obj, PyTypeObject *type) -> PyObject *{
+    auto implicit_caster = [](PyObject *obj, PyTypeObject *type) -> PyObject * {
         if (!detail::type_caster<InputType>().load(obj, false))
             return nullptr;
         tuple args(1);
@@ -892,13 +985,14 @@ template <typename InputType, typename OutputType> void implicitly_convertible()
             PyErr_Clear();
         return result;
     };
-    auto & registered_types = detail::get_internals().registered_types;
-    auto it = registered_types.find(&typeid(OutputType));
+    auto &registered_types = detail::get_internals().registered_types_cpp;
+    auto it = registered_types.find(std::type_index(typeid(OutputType)));
     if (it == registered_types.end())
-        throw std::runtime_error("implicitly_convertible: Unable to find type " + type_id<OutputType>());
-    it->second.implicit_conversions.push_back(implicit_caster);
+        pybind11_fail("implicitly_convertible: Unable to find type " + type_id<OutputType>());
+    ((detail::type_info *) it->second)->implicit_conversions.push_back(implicit_caster);
 }
 
+#if defined(WITH_THREAD)
 inline void init_threading() { PyEval_InitThreads(); }
 
 class gil_scoped_acquire {
@@ -914,6 +1008,7 @@ public:
     inline gil_scoped_release() { state = PyEval_SaveThread(); }
     inline ~gil_scoped_release() { PyEval_RestoreThread(state); }
 };
+#endif
 
 inline function get_overload(const void *this_ptr, const char *name)  {
     handle py_object = detail::get_object_handle(this_ptr);
@@ -933,9 +1028,10 @@ inline function get_overload(const void *this_ptr, const char *name)  {
         cache.insert(key);
         return function();
     }
+
     PyFrameObject *frame = PyThreadState_Get()->frame;
     pybind11::str caller = pybind11::handle(frame->f_code->co_name).str();
-    if (strcmp((const char *) caller, name) == 0)
+    if ((std::string) caller == name)
         return function();
     return overload;
 }
@@ -952,13 +1048,12 @@ inline function get_overload(const void *this_ptr, const char *name)  {
 
 #define PYBIND11_OVERLOAD_PURE(ret_type, class_name, name, ...) \
     PYBIND11_OVERLOAD_INT(ret_type, class_name, name, __VA_ARGS__) \
-    throw std::runtime_error("Tried to call pure virtual function \"" #name "\"");
+    pybind11::pybind11_fail("Tried to call pure virtual function \"" #name "\"");
 
 NAMESPACE_END(pybind11)
 
 #if defined(_MSC_VER)
-#pragma warning(pop)
+#  pragma warning(pop)
 #elif defined(__GNUG__) and !defined(__clang__)
-#pragma GCC diagnostic pop
+#  pragma GCC diagnostic pop
 #endif
-

@@ -30,91 +30,85 @@ public:
             API_PyArray_FromAny = 69,
             API_PyArray_NewCopy = 85,
             API_PyArray_NewFromDescr = 94,
-            NPY_C_CONTIGUOUS = 0x0001,
-            NPY_F_CONTIGUOUS = 0x0002,
-            NPY_NPY_ARRAY_FORCECAST = 0x0010,
-            NPY_ENSURE_ARRAY = 0x0040,
-            NPY_BOOL=0,
-            NPY_BYTE, NPY_UBYTE,
-            NPY_SHORT, NPY_USHORT,
-            NPY_INT, NPY_UINT,
-            NPY_LONG, NPY_ULONG,
-            NPY_LONGLONG, NPY_ULONGLONG,
-            NPY_FLOAT, NPY_DOUBLE, NPY_LONGDOUBLE,
-            NPY_CFLOAT, NPY_CDOUBLE, NPY_CLONGDOUBLE
+
+            NPY_C_CONTIGUOUS_ = 0x0001,
+            NPY_F_CONTIGUOUS_ = 0x0002,
+            NPY_ARRAY_FORCECAST_ = 0x0010,
+            NPY_ENSURE_ARRAY_ = 0x0040,
+            NPY_BOOL_ = 0,
+            NPY_BYTE_, NPY_UBYTE_,
+            NPY_SHORT_, NPY_USHORT_,
+            NPY_INT_, NPY_UINT_,
+            NPY_LONG_, NPY_ULONG_,
+            NPY_LONGLONG_, NPY_ULONGLONG_,
+            NPY_FLOAT_, NPY_DOUBLE_, NPY_LONGDOUBLE_,
+            NPY_CFLOAT_, NPY_CDOUBLE_, NPY_CLONGDOUBLE_
         };
 
         static API lookup() {
-            PyObject *numpy = PyImport_ImportModule("numpy.core.multiarray");
-            PyObject *capsule = numpy ? PyObject_GetAttrString(numpy, "_ARRAY_API") : nullptr;
+            module m = module::import("numpy.core.multiarray");
+            object c = (object) m.attr("_ARRAY_API");
 #if PY_MAJOR_VERSION >= 3
-            void **api_ptr = (void **) (capsule ? PyCapsule_GetPointer(capsule, NULL) : nullptr);
+            void **api_ptr = (void **) (c ? PyCapsule_GetPointer(c.ptr(), NULL) : nullptr);
 #else
-            void **api_ptr = (void **) (capsule ? PyCObject_AsVoidPtr(capsule) : nullptr);
+            void **api_ptr = (void **) (c ? PyCObject_AsVoidPtr(c.ptr()) : nullptr);
 #endif
-            Py_XDECREF(capsule);
-            Py_XDECREF(numpy);
-            if (api_ptr == nullptr)
-                throw std::runtime_error("Could not acquire pointer to NumPy API!");
             API api;
-            api.PyArray_Type          = (decltype(api.PyArray_Type))          api_ptr[API_PyArray_Type];
-            api.PyArray_DescrFromType = (decltype(api.PyArray_DescrFromType)) api_ptr[API_PyArray_DescrFromType];
-            api.PyArray_FromAny       = (decltype(api.PyArray_FromAny))       api_ptr[API_PyArray_FromAny];
-            api.PyArray_NewCopy       = (decltype(api.PyArray_NewCopy))       api_ptr[API_PyArray_NewCopy];
-            api.PyArray_NewFromDescr  = (decltype(api.PyArray_NewFromDescr))  api_ptr[API_PyArray_NewFromDescr];
+            api.PyArray_Type_          = (decltype(api.PyArray_Type_))          api_ptr[API_PyArray_Type];
+            api.PyArray_DescrFromType_ = (decltype(api.PyArray_DescrFromType_)) api_ptr[API_PyArray_DescrFromType];
+            api.PyArray_FromAny_       = (decltype(api.PyArray_FromAny_))       api_ptr[API_PyArray_FromAny];
+            api.PyArray_NewCopy_       = (decltype(api.PyArray_NewCopy_))       api_ptr[API_PyArray_NewCopy];
+            api.PyArray_NewFromDescr_  = (decltype(api.PyArray_NewFromDescr_))  api_ptr[API_PyArray_NewFromDescr];
             return api;
         }
 
-        bool PyArray_Check(PyObject *obj) const { return (bool) PyObject_TypeCheck(obj, PyArray_Type); }
+        bool PyArray_Check_(PyObject *obj) const { return (bool) PyObject_TypeCheck(obj, PyArray_Type_); }
 
-        PyObject *(*PyArray_DescrFromType)(int);
-        PyObject *(*PyArray_NewFromDescr)
+        PyObject *(*PyArray_DescrFromType_)(int);
+        PyObject *(*PyArray_NewFromDescr_)
             (PyTypeObject *, PyObject *, int, Py_intptr_t *,
              Py_intptr_t *, void *, int, PyObject *);
-        PyObject *(*PyArray_NewCopy)(PyObject *, int);
-        PyTypeObject *PyArray_Type;
-        PyObject *(*PyArray_FromAny) (PyObject *, PyObject *, int, int, int, PyObject *);
+        PyObject *(*PyArray_NewCopy_)(PyObject *, int);
+        PyTypeObject *PyArray_Type_;
+        PyObject *(*PyArray_FromAny_) (PyObject *, PyObject *, int, int, int, PyObject *);
     };
 
-    PYBIND11_OBJECT_DEFAULT(array, buffer, lookup_api().PyArray_Check)
+    PYBIND11_OBJECT_DEFAULT(array, buffer, lookup_api().PyArray_Check_)
 
     template <typename Type> array(size_t size, const Type *ptr) {
         API& api = lookup_api();
-        PyObject *descr = api.PyArray_DescrFromType(npy_format_descriptor<Type>::value);
+        PyObject *descr = api.PyArray_DescrFromType_(npy_format_descriptor<Type>::value);
         if (descr == nullptr)
-            throw std::runtime_error("NumPy: unsupported buffer format!");
+            pybind11_fail("NumPy: unsupported buffer format!");
         Py_intptr_t shape = (Py_intptr_t) size;
-        PyObject *tmp = api.PyArray_NewFromDescr(
-            api.PyArray_Type, descr, 1, &shape, nullptr, (void *) ptr, 0, nullptr);
-        if (tmp == nullptr)
-            throw std::runtime_error("NumPy: unable to create array!");
-        m_ptr = api.PyArray_NewCopy(tmp, -1 /* any order */);
-        Py_DECREF(tmp);
-        if (m_ptr == nullptr)
-            throw std::runtime_error("NumPy: unable to copy array!");
+        object tmp = object(api.PyArray_NewFromDescr_(
+            api.PyArray_Type_, descr, 1, &shape, nullptr, (void *) ptr, 0, nullptr), false);
+        if (ptr && tmp)
+            tmp = object(api.PyArray_NewCopy_(tmp.ptr(), -1 /* any order */), false);
+        if (!tmp)
+            pybind11_fail("NumPy: unable to create array!");
+        m_ptr = tmp.release().ptr();
     }
 
     array(const buffer_info &info) {
         API& api = lookup_api();
-        if (info.format.size() != 1)
-            throw std::runtime_error("Unsupported buffer format!");
+        if ((info.format.size() < 1) || (info.format.size() > 2))
+            pybind11_fail("Unsupported buffer format!");
         int fmt = (int) info.format[0];
-        if (info.format == "Zd")
-            fmt = API::NPY_CDOUBLE;
-        else if (info.format == "Zf")
-            fmt = API::NPY_CFLOAT;
-        PyObject *descr = api.PyArray_DescrFromType(fmt);
+        if (info.format == "Zd")      fmt = API::NPY_CDOUBLE_;
+        else if (info.format == "Zf") fmt = API::NPY_CFLOAT_;
+
+        PyObject *descr = api.PyArray_DescrFromType_(fmt);
         if (descr == nullptr)
-            throw std::runtime_error("NumPy: unsupported buffer format '" + info.format + "'!");
-        PyObject *tmp = api.PyArray_NewFromDescr(
-            api.PyArray_Type, descr, info.ndim, (Py_intptr_t *) &info.shape[0],
-            (Py_intptr_t *) &info.strides[0], info.ptr, 0, nullptr);
-        if (tmp == nullptr)
-            throw std::runtime_error("NumPy: unable to create array!");
-        m_ptr = api.PyArray_NewCopy(tmp, -1 /* any order */);
-        Py_DECREF(tmp);
-        if (m_ptr == nullptr)
-            throw std::runtime_error("NumPy: unable to copy array!");
+            pybind11_fail("NumPy: unsupported buffer format '" + info.format + "'!");
+        object tmp(api.PyArray_NewFromDescr_(
+            api.PyArray_Type_, descr, info.ndim, (Py_intptr_t *) &info.shape[0],
+            (Py_intptr_t *) &info.strides[0], info.ptr, 0, nullptr), false);
+        if (info.ptr && tmp)
+            tmp = object(api.PyArray_NewCopy_(tmp.ptr(), -1 /* any order */), false);
+        if (!tmp)
+            pybind11_fail("NumPy: unable to create array!");
+        m_ptr = tmp.release().ptr();
     }
 
 protected:
@@ -129,36 +123,32 @@ public:
     PYBIND11_OBJECT_CVT(array_t, array, is_non_null, m_ptr = ensure(m_ptr));
     array_t() : array() { }
     static bool is_non_null(PyObject *ptr) { return ptr != nullptr; }
-    PyObject *ensure(PyObject *ptr) {
+    static PyObject *ensure(PyObject *ptr) {
         if (ptr == nullptr)
             return nullptr;
         API &api = lookup_api();
-        PyObject *descr = api.PyArray_DescrFromType(npy_format_descriptor<T>::value);
-        return api.PyArray_FromAny(ptr, descr, 0, 0,
-                                   API::NPY_C_CONTIGUOUS | API::NPY_ENSURE_ARRAY |
-                                   API::NPY_NPY_ARRAY_FORCECAST, nullptr);
+        PyObject *descr = api.PyArray_DescrFromType_(npy_format_descriptor<T>::value);
+        PyObject *result = api.PyArray_FromAny_(
+            ptr, descr, 0, 0, API::NPY_C_CONTIGUOUS_ | API::NPY_ENSURE_ARRAY_
+                            | API::NPY_ARRAY_FORCECAST_, nullptr);
+        Py_DECREF(ptr);
+        return result;
     }
 };
 
 #define DECL_FMT(t, n) template<> struct npy_format_descriptor<t> { enum { value = array::API::n }; }
-DECL_FMT(int8_t, NPY_BYTE);  DECL_FMT(uint8_t, NPY_UBYTE); DECL_FMT(int16_t, NPY_SHORT);
-DECL_FMT(uint16_t, NPY_USHORT); DECL_FMT(int32_t, NPY_INT); DECL_FMT(uint32_t, NPY_UINT);
-DECL_FMT(int64_t, NPY_LONGLONG); DECL_FMT(uint64_t, NPY_ULONGLONG); DECL_FMT(float, NPY_FLOAT);
-DECL_FMT(double, NPY_DOUBLE); DECL_FMT(bool, NPY_BOOL); DECL_FMT(std::complex<float>, NPY_CFLOAT);
-DECL_FMT(std::complex<double>, NPY_CDOUBLE);
+DECL_FMT(int8_t, NPY_BYTE_);  DECL_FMT(uint8_t, NPY_UBYTE_); DECL_FMT(int16_t, NPY_SHORT_);
+DECL_FMT(uint16_t, NPY_USHORT_); DECL_FMT(int32_t, NPY_INT_); DECL_FMT(uint32_t, NPY_UINT_);
+DECL_FMT(int64_t, NPY_LONGLONG_); DECL_FMT(uint64_t, NPY_ULONGLONG_); DECL_FMT(float, NPY_FLOAT_);
+DECL_FMT(double, NPY_DOUBLE_); DECL_FMT(bool, NPY_BOOL_); DECL_FMT(std::complex<float>, NPY_CFLOAT_);
+DECL_FMT(std::complex<double>, NPY_CDOUBLE_);
 #undef DECL_FMT
 
-
 NAMESPACE_BEGIN(detail)
-PYBIND11_TYPE_CASTER_PYTYPE(array)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<int8_t>)  PYBIND11_TYPE_CASTER_PYTYPE(array_t<uint8_t>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<int16_t>) PYBIND11_TYPE_CASTER_PYTYPE(array_t<uint16_t>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<int32_t>) PYBIND11_TYPE_CASTER_PYTYPE(array_t<uint32_t>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<int64_t>) PYBIND11_TYPE_CASTER_PYTYPE(array_t<uint64_t>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<float>)   PYBIND11_TYPE_CASTER_PYTYPE(array_t<double>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<std::complex<float>>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<std::complex<double>>)
-PYBIND11_TYPE_CASTER_PYTYPE(array_t<bool>)
+
+template <typename T> struct handle_type_name<array_t<T>> {
+    static PYBIND11_DESCR name() { return _("array[") + type_caster<T>::name() + _("]"); }
+};
 
 template <typename Func, typename Return, typename... Args>
 struct vectorize_helper {
@@ -177,13 +167,13 @@ struct vectorize_helper {
         std::array<buffer_info, N> buffers {{ args.request()... }};
 
         /* Determine dimensions parameters of output array */
-        int ndim = 0; size_t count = 0;
+        int ndim = 0; size_t size = 0;
         std::vector<size_t> shape;
         for (size_t i=0; i<N; ++i) {
-            if (buffers[i].count > count) {
+            if (buffers[i].size > size) {
                 ndim = buffers[i].ndim;
                 shape = buffers[i].shape;
-                count = buffers[i].count;
+                size = buffers[i].size;
             }
         }
         std::vector<size_t> strides(ndim);
@@ -194,25 +184,27 @@ struct vectorize_helper {
         }
 
         /* Check if the parameters are actually compatible */
-        for (size_t i=0; i<N; ++i) {
-            if (buffers[i].count != 1 && (buffers[i].ndim != ndim || buffers[i].shape != shape))
-                throw std::runtime_error("pybind11::vectorize: incompatible size/dimension of inputs!");
-        }
+        for (size_t i=0; i<N; ++i)
+            if (buffers[i].size != 1 && (buffers[i].ndim != ndim || buffers[i].shape != shape))
+                pybind11_fail("pybind11::vectorize: incompatible size/dimension of inputs!");
 
-        /* Call the function */
-        std::vector<Return> result(count);
-        for (size_t i=0; i<count; ++i)
-            result[i] = f((buffers[Index].count == 1
-                               ? *((Args *) buffers[Index].ptr)
-                               :  ((Args *) buffers[Index].ptr)[i])...);
+        if (size == 1)
+            return cast(f(*((Args *) buffers[Index].ptr)...));
 
-        if (count == 1)
-            return cast(result[0]);
-
-        /* Return the result */
-        return array(buffer_info(result.data(), sizeof(Return),
+        array result(buffer_info(nullptr, sizeof(Return),
             format_descriptor<Return>::value(),
             ndim, shape, strides));
+
+        buffer_info buf = result.request();
+        Return *output = (Return *) buf.ptr;
+
+        /* Call the function */
+        for (size_t i=0; i<size; ++i)
+            output[i] = f((buffers[Index].size == 1
+                               ? *((Args *) buffers[Index].ptr)
+                               : ((Args *) buffers[Index].ptr)[i])...);
+
+        return result;
     }
 };
 
