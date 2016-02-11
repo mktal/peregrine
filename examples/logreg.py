@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-05 21:51:20
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-10 22:50:37
+# @Last Modified time: 2016-02-10 23:05:28
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -128,7 +128,7 @@ class LogRegDM(object):
 def peregrineLogReg(sc, data_path):
     dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).cache()
     prob = LogRegDM(dataset, cached=True, l2_reg=0.001)
-    descend(prob, verbose=1, max_iter=30, l1_reg=0.001, precision='d')
+    descend(prob, verbose=1, max_iter=30, l1_reg=0.001, precision='f')
 
 
 if __name__ == '__main__':

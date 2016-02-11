@@ -1,7 +1,7 @@
 /*
 * @Date:   2015-12-15 16:13:07
 * @Last Modified by:   Xiaocheng Tang
-* @Last Modified time: 2016-02-10 22:52:05
+* @Last Modified time: 2016-02-10 23:03:17
 *
 * Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 * All rights reserved.
@@ -77,11 +77,11 @@ void _train(py::object f_func, py::object g_func, size_t dim,
     param->method_flag = method_flag;
 
     if (precision == 'f') {
-        std::cout << "Solve in single precision...." << std::endl;
+        std::cout << "Solving in single precision...." << std::endl;
         _run<float>(f_func, g_func, dim, param);
     }
     else {
-        std::cout << "Solve in double precision...." << std::endl;
+        std::cout << "Solving in double precision...." << std::endl;
         _run<double>(f_func, g_func, dim, param);
     }
     delete param;
