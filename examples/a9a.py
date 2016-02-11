@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 21:51:20
-# @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-01-05 21:25:50
+# @Last Modified by:   xtang
+# @Last Modified time: 2016-01-06 22:44:24
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -35,14 +35,16 @@ def sparkLogReg(sc, data_path):
 
 def cahowLogReg(sc, data_path):
     dataset = MLUtils.loadLibSVMFile(sc, data_path, minPartitions=8).cache()
-    prob = LogRegDM(dataset, cached=True, l2_reg=0.001)
+    prob = LogRegDM(dataset, cached=True, l2_reg=0.)
     descend(prob, verbose=1, max_iter=30, l1_reg=0.001)
 
 
 if __name__ == '__main__':
+    # import sys
+    # print sys.argv[1]
     with SparkController() as sc:
-        # sparkLogReg(sc, './data/a9a')
-        cahowLogReg(sc, '/Users/xtang/Documents/cahow/examples/data/a9a')
+        sparkLogReg(sc, '/Users/xtang/Documents/cahow/examples/data/a9a')
+        # cahowLogReg(sc, '/Users/xtang/Documents/cahow/examples/data/a9a')
 
 
 

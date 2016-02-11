@@ -14,7 +14,7 @@ LDBLAS = -llapack -lblas
 CXXBLAS = -DUSE_CBLAS
 
 ifeq ($(USE_ACCELERATE), true)
-	LDBLAS = -framework Accelerate -framework CoreFoundation
+	LDBLAS = -framework Accelerate
     $(info **use accelerate BLAS....)
 endif
 ifeq ($(USE_OPENBLAS), true)
@@ -24,7 +24,7 @@ endif
 
 LDPYTHON = -Wl,-rpath,$(PYTHON_ROOT) -L${PYTHON_LINK} -lpython2.7
 LDFLAGS = -Wall -shared ${LDPYTHON} ${LDBLAS}
-CXXOPTFLAGS = -Wall -fpic -m64 -fno-omit-frame-pointer -std=c++11 -O3 -DNDEBUG ${CXXBLAS} $(CXX_INCLUDES)
+CXXOPTFLAGS = -Wall -fpic -m64 -fno-omit-frame-pointer -std=c++11 -g -O0 -DNDEBUG ${CXXBLAS} $(CXX_INCLUDES)
 
 %.so: src/peregrine.cpp src/array.cpp src/lhac-py-gen.cpp
 	$(CXX) $(CXXOPTFLAGS) $(LDFLAGS) $^ -o $@

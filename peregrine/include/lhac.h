@@ -952,17 +952,6 @@ private:
         T1 mu = 1.0;
         T1 rho = param->rho;
         int msgFlag = param->verbose;
-        T1 z = 0.0;
-        T1 Hd_j;
-        T1 Hii;
-        T1 G;
-        T1 Gp;
-        T1 Gn;
-        T1 wpd;
-        T1 Hwd;
-        T1 Qd_bar;
-        T1 f_mdl;
-        T1 rho_trial;
         memcpy(w_prev, w, p*sizeof(T1));
         const T1 lmd = param->lmd;
         const unsigned long l = param->l;
@@ -992,15 +981,15 @@ private:
                     unsigned long idx = idxs[rii].j;
                     unsigned long idx_Q = permut[rii];
                     unsigned long Q_idx_m = idx_Q*m;
-                    Qd_bar = lcddot(m, &Q[Q_idx_m], 1, d_bar, 1);
-                    Hd_j = gama_scale*D[idx] - Qd_bar;
-                    Hii = H_diag[idx_Q] + dH_diag;
-                    G = Hd_j + L_grad[idx];
-                    Gp = G + lmd;
-                    Gn = G - lmd;
-                    wpd = w_prev[idx] + D[idx];
-                    Hwd = Hii * wpd;
-                    z = -wpd;
+                    T1 Qd_bar = lcddot(m, &Q[Q_idx_m], 1, d_bar, 1);
+                    T1 Hd_j = gama_scale*D[idx] - Qd_bar;
+                    T1 Hii = H_diag[idx_Q] + dH_diag;
+                    T1 G = Hd_j + L_grad[idx];
+                    T1 Gp = G + lmd;
+                    T1 Gn = G - lmd;
+                    T1 wpd = w_prev[idx] + D[idx];
+                    T1 Hwd = Hii * wpd;
+                    T1 z = -wpd;
                     if (Gp <= Hwd) z = -Gp/Hii;
                     if (Gn >= Hwd) z = -Gn/Hii;
                     D[idx] = D[idx] + z;
@@ -1034,8 +1023,8 @@ private:
             }
             order2 = mu*gama*lcddot((int)p, D, 1, D, 1)-vp;
             order2 = order2*0.5;
-            f_mdl = obj->f + order1 + order2 + g_trial;
-            rho_trial = (obj_trial-obj->val)/(f_mdl-obj->val);
+            T1 f_mdl = obj->f + order1 + order2 + g_trial;
+            T1 rho_trial = (obj_trial-obj->val)/(f_mdl-obj->val);
             if (msgFlag >= LHAC_MSG_SD) {
                 printf("\t \t \t # of line searches = %3d; model quality: %+.3f\n", sd_iters, rho_trial);
             }

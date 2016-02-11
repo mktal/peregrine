@@ -3,6 +3,7 @@
 /example/build*
 
 # Ignore generated code files
+*.so.dSYM
 *.so
 *.o
 *.pyc
