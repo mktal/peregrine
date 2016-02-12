@@ -8,6 +8,7 @@
 *.o
 *.pyc
 *.cmd
+*.egg-info
 
 # Meta data of Mac OS X's Finder.app
 .DS_Store

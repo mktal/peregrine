@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-06 20:16:33
 # @Last Modified by:   xtang
-# @Last Modified time: 2016-01-06 22:22:23
+# @Last Modified time: 2016-02-11 14:59:36
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -21,7 +21,7 @@ PYTHON_ROOT = '/Users/xtang/anaconda'
 PYTHON_LINK = PYTHON_ROOT + '/lib'
 PYTHON_INCLUDE = PYTHON_ROOT + '/include/python2.7'
 
-link_flags = ['-framework Accelerate','-Wall', '-shared']
+link_flags = ['-Wall']
 link_flags.append(
     '-Wl,-rpath,{PYTHON_ROOT} -L{PYTHON_LINK} -lpython2.7'
     .format(**locals())
@@ -29,18 +29,16 @@ link_flags.append(
 
 flags = [
     '-fpic', '-fno-omit-frame-pointer',
-    '-std=c++11', '-DUSE_CBLAS',
+    '-std=c++11', '-DUSE_CBLAS', '-m64', '-stdlib=libc++',
     '-I{PYTHON_INCLUDE}'.format(**locals())
 ]
 
-# os.environ["CXX"] = "clang++"
-# os.environ["CC"] = "clang++"
-
 os.environ.setdefault('CC', 'clang++')
 os.environ.setdefault('CXX', 'clang++')
+os.environ.setdefault('MACOSX_DEPLOYMENT_TARGET', '10.7')
 
 peregrine_extension = Extension(
-    '_peregrine',
+    'peregrine._peregrine',
     sources=sources,
     language="c++",
     include_dirs=[os.path.join('.', 'peregrine', 'include')],
