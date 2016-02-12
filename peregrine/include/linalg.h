@@ -127,6 +127,37 @@ extern "C" {
                INTT *lda, float *x, INTT *incx, float *beta, float *y,
                INTT *incy);
 }
+
+template <typename T1> inline T1 dot(INTT *n, T1 *dx, INTT *incx, T1 *dy, INTT *incy);
+template <typename T1> inline void gemm(char *transa, char *transb, INTT *m, INTT *n, INTT *k,
+           T1 *alpha, T1 *a, INTT *lda, T1 *b, INTT *ldb, T1 *beta, T1 *c, INTT *ldc);
+template <typename T1> inline void gemv(char *trans, INTT *m, INTT *n, T1 *alpha, T1 *a,
+           INTT *lda, T1 *x, INTT *incx, T1 *beta, T1 *y, INTT *incy);
+
+template <> inline double dot<double>(INTT *n, double *dx, INTT *incx, double *dy, INTT *incy) {
+    return ddot(n, dx, incx, dy, incy);
+};
+template <> inline float dot<float>(INTT *n, float *dx, INTT *incx, float *dy, INTT *incy) {
+    return sdot(n, dx, incx, dy, incy);
+};
+template <> inline void gemm<double>(char *transa, char *transb, INTT *m, INTT *n, INTT *k,
+           double *alpha, double *a, INTT *lda, double *b, INTT *ldb,
+           double *beta, double *c, INTT *ldc) {
+    dgemm(transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+};
+template <> inline void gemm<float>(char *transa, char *transb, INTT *m, INTT *n, INTT *k,
+           float *alpha, float *a, INTT *lda, float *b, INTT *ldb, float *beta, float *c, INTT *ldc) {
+    sgemm(transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+};
+template <> inline void gemv<double>(char *trans, INTT *m, INTT *n, double *alpha, double *a,
+           INTT *lda, double *x, INTT *incx, double *beta, double *y, INTT *incy) {
+    dgemv(trans, m, n, alpha, a, lda, x, incx, beta, y, incy);
+};
+template <> inline void gemv<float>(char *trans, INTT *m, INTT *n, float *alpha, float *a,
+           INTT *lda, float *x, INTT *incx, float *beta, float *y, INTT *incy) {
+    sgemv(trans, m, n, alpha, a, lda, x, incx, beta, y, incy);
+};
+
 static char CBLAS_TRANSPOSE_CHAR[] = {'N', 'T', 'C'};
 inline char *blas_transpose(CBLAS_TRANSPOSE TransA)
 {
@@ -209,7 +240,7 @@ inline T1 lcddot(const int n, T1* dx, const int incx,
     INTT _n = (INTT) n;
     INTT _incx = (INTT) incx;
     INTT _incy = (INTT) incy;
-    return ddot(&_n, dx, &_incx, dy, &_incy);
+    return dot<T1>(&_n, dx, &_incx, dy, &_incy);
 #endif
 }
 
@@ -223,13 +254,13 @@ inline void lcdgemv(const enum CBLAS_ORDER Order,
 #ifdef USE_CBLAS
     cblas_gemv<T1>(Order, TransA, m, n, 1.0, A, lda, b, 1, 0.0, c, 1);
 #else
-    static double one = 1.0;
-    static double zero = 0.0;
+    static T1 one = 1.0;
+    static T1 zero = 0.0;
     INTT one_int = 1;
     INTT blas_m = (INTT) m;
     INTT blas_n = (INTT) n;
     INTT blas_lda = (INTT) lda;
-    dgemv(blas_transpose(TransA), &blas_m, &blas_n, &one, A, &blas_lda, b, &one_int, &zero, c, &one_int);
+    gemv<T1>(blas_transpose(TransA), &blas_m, &blas_n, &one, A, &blas_lda, b, &one_int, &zero, c, &one_int);
 #endif
 }
 
@@ -250,9 +281,9 @@ inline void lcgdgemm(const enum CBLAS_TRANSPOSE TransA,
     INTT _lda = (INTT) lda;
     INTT _ldb = (INTT) ldb;
     INTT _ldc = (INTT) ldc;
-    double _alpha = alpha;
-    double _beta = beta;
-    dgemm(blas_transpose(TransA), blas_transpose(TransB),
+    T1 _alpha = alpha;
+    T1 _beta = beta;
+    gemm<T1>(blas_transpose(TransA), blas_transpose(TransB),
           &_M, &_N,&_K, &_alpha, A, &_lda, B, &_ldb, &_beta, C, &_ldc);
 #endif
 }
@@ -265,9 +296,9 @@ inline void lcdgemm(T1* A, T1* B, T1* C,
 #else
     INTT _mA = (INTT) mA;
     INTT _nB = (INTT) nB;
-    static double one = 1.0;
-    static double zero = 0.0;
-    dgemm((char*) "N", (char*) "N", &_mA, &_nB, &_mA, &one, A, &_mA, B, &_mA, &zero, C, &_mA);
+    static T1 one = 1.0;
+    static T1 zero = 0.0;
+    gemm<T1>((char*) "N", (char*) "N", &_mA, &_nB, &_mA, &one, A, &_mA, B, &_mA, &zero, C, &_mA);
 #endif
 }
 
