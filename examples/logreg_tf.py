@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-11 22:22:00
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-11 23:01:08
+# @Last Modified time: 2016-02-11 23:53:30
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -48,5 +48,5 @@ def peregrineLogReg(sc, data_path):
 
 if __name__ == '__main__':
     with SparkController() as sc:
-        peregrineLogReg(sc, '/Users/xtang/Documents/peregrine/examples/data/a9a')
+        peregrineLogReg(sc, './data/a9a')
 

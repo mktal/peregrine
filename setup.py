@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-06 20:16:33
-# @Last Modified by:   xtang
-# @Last Modified time: 2016-02-11 14:59:36
+# @Last Modified by:   Xiaocheng Tang
+# @Last Modified time: 2016-02-11 23:53:40
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -33,8 +33,8 @@ flags = [
     '-I{PYTHON_INCLUDE}'.format(**locals())
 ]
 
-os.environ.setdefault('CC', 'clang++')
-os.environ.setdefault('CXX', 'clang++')
+os.environ.setdefault('CC', 'g++')
+os.environ.setdefault('CXX', 'g++')
 os.environ.setdefault('MACOSX_DEPLOYMENT_TARGET', '10.7')
 
 peregrine_extension = Extension(
