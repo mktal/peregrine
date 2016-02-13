@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 17:01:51
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 17:05:59
+# @Last Modified time: 2016-02-12 23:26:11
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -20,4 +20,4 @@ with SparkController() as sc:
     descend(prob, verbose=0, max_iter=30, l1_reg=0.001, precision='f')
 
     prob = logistic_regression(dataset, l2_reg=0.001, tensorflow=True)
-    descend(prob, verbose=0, max_iter=30, l1_reg=0.001, precision='f')
+    descend(prob, verbose=0, max_iter=50, l1_reg=0.001, precision='f')

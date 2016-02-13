@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 16:00:32
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 16:57:05
+# @Last Modified time: 2016-02-12 17:32:12
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -71,5 +71,6 @@ class LogRegWithTF(object):
         X, Y, n = worker.features, worker.labels, worker.n_samples
         assert(X.ndim == 2 and Y.ndim == 1)
         if not self.sess: self._initialize(self.dim)
-        return self.sess.run([self.loss, self.grads],
+        loss, df = self.sess.run([self.loss, self.grads],
                              feed_dict={self.x: X, self.y: Y, self.w: w})
+        return loss/n, df/n
