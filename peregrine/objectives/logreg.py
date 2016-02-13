@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 16:00:32
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 17:32:12
+# @Last Modified time: 2016-02-12 23:59:55
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -10,7 +10,6 @@
 from functools import partial
 
 import numpy as np
-import tensorflow as tf
 
 from .execution import Worker
 from .execution import Executor
@@ -57,6 +56,7 @@ class LogRegWithTF(object):
         self.sess = None
 
     def _initialize(self, dim):
+        import tensorflow as tf
         self.dim = dim
         self.w = tf.Variable(tf.zeros([dim]), name='model')
         self.x = tf.placeholder("float", [None, dim], name='features')
