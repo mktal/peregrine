@@ -8,7 +8,9 @@
 # All rights reserved.
 
 from setuptools import Extension, setup
+from sys import platform as _platform
 import os
+
 
 
 sources = [
@@ -17,21 +19,18 @@ sources = [
     'peregrine/src/peregrine.cpp'
 ]
 
-PYTHON_ROOT = '/Users/xtang/anaconda'
-PYTHON_LINK = PYTHON_ROOT + '/lib'
-PYTHON_INCLUDE = PYTHON_ROOT + '/include/python2.7'
-
-link_flags = ['-Wall']
-link_flags.append(
-    '-Wl,-rpath,{PYTHON_ROOT} -L{PYTHON_LINK} -lpython2.7'
-    .format(**locals())
-)
+link_flags = ['-Wall', '-llapack', '-lblas', '-lpython2.7']
 
 flags = [
     '-fpic', '-fno-omit-frame-pointer',
-    '-std=c++11', '-DUSE_CBLAS', '-m64', '-stdlib=libc++',
-    '-I{PYTHON_INCLUDE}'.format(**locals())
+    '-std=c++11', '-DUSE_CBLAS', '-m64'
 ]
+
+# MAC OS X
+if _platform == "darwin":
+    flags.append('-stdlib=libc++')
+# elif _platform in ('linux', 'linux2'):
+    # pass
 
 os.environ.setdefault('CC', 'g++')
 os.environ.setdefault('CXX', 'g++')

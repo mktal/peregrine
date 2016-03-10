@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-03-08 21:48:34
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-03-08 21:49:06
+# @Last Modified time: 2016-03-09 16:05:17
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -25,4 +25,4 @@ def load_digits():
 
 dataset = Worker(*load_digits())
 prob = logistic_regression(dataset, l2_reg=0.001)
-descend(prob, verbose=1, max_iter=60, l1_reg=0.001, precision='f')
+descend(prob, verbose=1, max_iter=60, l1_reg=0.001, precision='d')
