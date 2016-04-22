@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 16:02:25
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 16:36:14
+# @Last Modified time: 2016-04-21 11:15:13
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -33,7 +33,7 @@ def _make_matrix_sparse(rows):
     return X, Y
 
 
-def weighted_merge(datasets, w, func):
+def collect(datasets, w, func):
     def seqOp(v, row):
         l, g = func(w, row)
         return v[0]+l, v[1]+g, row.n_samples
@@ -47,10 +47,6 @@ def weighted_merge(datasets, w, func):
 
     res = datasets.treeAggregate((0, 0), seqOp, combOp)
     return res[0], res[1]
-
-
-def single_merge(datasets, w, func):
-    return func(w, datasets)
 
 
 class Worker(object):

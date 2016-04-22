@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 16:00:32
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 23:59:55
+# @Last Modified time: 2016-04-21 16:05:02
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -11,10 +11,14 @@ from functools import partial
 
 import numpy as np
 
-from .execution import Worker
-from .execution import Executor
-from .execution import single_merge
-from .execution import weighted_merge
+import peregrine
+from peregrine.objectives import Worker
+from peregrine.objectives import Executor
+from peregrine.objectives import collect
+
+
+def collect_one(datasets, w, func):
+    return func(w, datasets)
 
 
 def logistic_regression(labeledPoints, l2_reg=0.,
@@ -22,7 +26,7 @@ def logistic_regression(labeledPoints, l2_reg=0.,
     if isinstance(labeledPoints, Worker):
         n, d = labeledPoints.n_samples, labeledPoints.n_features
         _trans_func = LogRegWithTF(d).run if tensorflow else logreg_local
-        return Executor(labeledPoints, n, d, single_merge, _trans_func,
+        return Executor(labeledPoints, n, d, collect_one, _trans_func,
                         cached=True, l2_reg=l2_reg)
     else:
         from pyspark import RDD
@@ -31,10 +35,10 @@ def logistic_regression(labeledPoints, l2_reg=0.,
         n = labeledPoints.count()
         d = labeledPoints.first().features.size
         dense = True if tensorflow else dense
-        make_matrix = partial(Worker.from_rows, dense=dense)
-        labeledPoints = labeledPoints.glom().map(make_matrix).cache()
+        make_worker = partial(Worker.from_rows, dense=dense)
+        labeledPoints = labeledPoints.glom().map(make_worker).cache()
         _trans_func = LogRegWithTF(d).run if tensorflow else logreg_local
-        return Executor(labeledPoints, n, d, weighted_merge, _trans_func,
+        return Executor(labeledPoints, n, d, collect, _trans_func,
                         cached=True, l2_reg=l2_reg)
 
 

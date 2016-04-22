@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-06 20:16:33
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-11 23:53:40
+# @Last Modified time: 2016-04-21 14:48:20
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -34,7 +34,7 @@ if _platform == "darwin":
 
 os.environ.setdefault('CC', 'g++')
 os.environ.setdefault('CXX', 'g++')
-os.environ.setdefault('MACOSX_DEPLOYMENT_TARGET', '10.7')
+os.environ.setdefault('MACOSX_DEPLOYMENT_TARGET', '10.8')
 
 peregrine_extension = Extension(
     'peregrine._peregrine',
