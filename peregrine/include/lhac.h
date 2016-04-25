@@ -297,15 +297,22 @@ public:
         d_bar = new T1[2*param->l]; // 2*l
 
         /* initiate */
-        memset(w, 0, p*sizeof(T1));
-        memset(w_prev, 0, p*sizeof(T1));
+        if (_param->w_initial == NULL) {
+            memset(w, 0, p*sizeof(T1));
+            memset(w_prev, 0, p*sizeof(T1));
+        } else {
+            for (size_t i = 0; i < p; ++i)
+                w[i] = (T1) _param->w_initial[i];
+            // w_prev is set in initialStep()
+        }
+
         memset(D, 0, p*sizeof(T1));
 
         sols = new Solution<T1>(max_iter, p);
         work_set = new work_set_struct(p);
         lR = new LBFGS<T1>(p, l, (T1) param->shrink);
 
-        ista_size = 1;
+        ista_size = (T1) _param->stepsize_initial;
 
     };
 
@@ -526,48 +533,50 @@ private:
 
     void initialStep() {
         // initial step (only for l1)
-        for (unsigned long idx = 0; idx < p; idx++) {
-            T1 G = L_grad[idx];
-            T1 Gp = G + lmd;
-            T1 Gn = G - lmd;
-            T1 Hwd = 0.0;
-            if (Gp <= Hwd)
-                D[idx] = -Gp;
-            else if (Gn >= Hwd)
-                D[idx] = -Gn;
-            else
-                D[idx] = 0.0;
-        }
-        T1 a = 1.0;
-        T1 l1_next = 0.0;
-        T1 delta = 0.0;
-        for (unsigned long i = 0; i < p; i++) {
-            w[i] += D[i];
-            l1_next += lmd*fabs(w[i]);
-            delta += L_grad[i]*D[i];
-        }
-        delta += l1_next - obj->g;
-        // line search
-        for (unsigned long lineiter = 0; lineiter < 1000; lineiter++) {
-            T1 f_trial = mdl->computeObject(w);
-            T1 obj_trial = f_trial + l1_next;
-            if (obj_trial < obj->val + a*0.001*delta) {
-                obj->add(f_trial, l1_next);
-                break;
-            }
-            a = 0.5*a;
-            l1_next = 0;
-            for (unsigned long i = 0; i < p; i++) {
-                w[i] = w_prev[i] + a*D[i];
-                l1_next += lmd*fabs(w[i]);
-            }
-        }
+        // for (unsigned long idx = 0; idx < p; idx++) {
+        //     T1 G = L_grad[idx];
+        //     T1 Gp = G + lmd;
+        //     T1 Gn = G - lmd;
+        //     T1 Hwd = 0.0;
+        //     if (Gp <= Hwd)
+        //         D[idx] = -Gp;
+        //     else if (Gn >= Hwd)
+        //         D[idx] = -Gn;
+        //     else
+        //         D[idx] = 0.0;
+        // }
+        // T1 a = 1.0;
+        // T1 l1_next = 0.0;
+        // T1 delta = 0.0;
+        // for (unsigned long i = 0; i < p; i++) {
+        //     w[i] += D[i];
+        //     l1_next += lmd*fabs(w[i]);
+        //     delta += L_grad[i]*D[i];
+        // }
+        // delta += l1_next - obj->g;
+        // // line search
+        // for (unsigned long lineiter = 0; lineiter < 1000; lineiter++) {
+        //     T1 f_trial = mdl->computeObject(w);
+        //     T1 obj_trial = f_trial + l1_next;
+        //     if (obj_trial < obj->val + a*0.001*delta) {
+        //         obj->add(f_trial, l1_next);
+        //         break;
+        //     }
+        //     a = 0.5*a;
+        //     l1_next = 0;
+        //     for (unsigned long i = 0; i < p; i++) {
+        //         w[i] = w_prev[i] + a*D[i];
+        //         l1_next += lmd*fabs(w[i]);
+        //     }
+        // }
+        istaStep();
         memcpy(L_grad_prev, L_grad, p*sizeof(T1));
         mdl->computeGradient(w, L_grad);
         lR->initData(w, w_prev, L_grad, L_grad_prev);
     }
 
     int istaStep() {
+        printf("Finding the proper initial step size...\n");
         memcpy(w_prev, w, p*sizeof(T1));
         for (int backtrack=0; backtrack<200; backtrack++) {
             T1 t = ista_size*lmd;
@@ -590,6 +599,7 @@ private:
                 ista_size = ista_size * 0.5;
                 continue;
             }
+            printf("SET initial step size to %f\n", ista_size);
             obj->add(f_trial, 0);
             return 0;
         }

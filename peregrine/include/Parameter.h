@@ -26,6 +26,8 @@ struct Parameter {
     // active set stragety
     unsigned long active_set;
     int method_flag;
+    const float* w_initial;
+    float stepsize_initial;
 };
 
 #endif

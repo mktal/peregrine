@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 16:46:25
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-04-22 10:54:11
+# @Last Modified time: 2016-04-24 12:10:09
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -65,5 +65,8 @@ prob = LogregExecutor(*load_digits())
 #                 transition_func=logreg_from,
 #                 cached=True, l2_reg=0.1)
 
-descend(prob, verbose=1, max_iter=30, l1_reg=0.002, precision='f')
+initial_model = np.random.random(prob.n_variables)
+# initial_model = []
+descend(prob, list(initial_model), initial_stepsize=0.1,
+        verbose=1, max_iter=30, l1_reg=0.002, precision='f')
 

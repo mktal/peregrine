@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-04 20:21:11
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 15:10:01
+# @Last Modified time: 2016-04-24 18:26:04
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -14,8 +14,9 @@ from ._peregrine import _train
 import objectives
 
 
-def descend(objective, verbose=2, opt_tol=1e-8, max_iter=500,
-            memory=10, l1_reg=1e-6, precision='f', **kwargs):
+def descend(objective, initial_model=None, initial_stepsize=1,
+            verbose=2, opt_tol=1e-8,
+            max_iter=500, memory=10, l1_reg=1e-6, precision='f', **kwargs):
     """Proximal quasi-Newton (L-BFGS) minimizer for composite function
 
     Parameters
@@ -45,5 +46,11 @@ def descend(objective, verbose=2, opt_tol=1e-8, max_iter=500,
 
     """
     f, g, dim = objective.eval_obj, objective.eval_grad, objective.n_variables
-    return _train(f, g, dim, verbose, opt_tol,
-                  max_iter, memory, l1_reg, precision)
+    initial_model = [] if initial_model is None else initial_model
+    if hasattr(objective, 'final'):
+        final_func = objective.final
+    else:
+        final_func = lambda w: None
+    return _train(f, g, final_func, dim, initial_model,
+                  initial_stepsize, verbose,
+                  opt_tol, max_iter, memory, l1_reg, precision)
