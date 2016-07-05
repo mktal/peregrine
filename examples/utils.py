@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 23:01:45
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-02-12 17:24:14
+# @Last Modified time: 2016-07-05 11:47:57
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
+
 
 from pyspark import SparkConf, SparkContext
 from sklearn.datasets import load_svmlight_file
@@ -60,7 +61,7 @@ def load_digits():
 
 
 def load_mnist():
-  data, target = load_svmlight_file('/Users/xtang/data/mnist_0_6')
+  data, target = load_svmlight_file('./data/mnist_0_6')
   print('load mnist for classification: {}'.format(data.shape))
   return np.asarray(data.todense()), target
 
