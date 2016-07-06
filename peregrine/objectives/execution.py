@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-02-12 16:02:25
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-06-10 14:53:56
+# @Last Modified time: 2016-07-05 14:04:07
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -65,7 +65,6 @@ class Worker(object):
 
 
 class Executor(object):
-    """ Distributed Matrix form"""
     def __init__(self, labeledPoints, n_samples, n_features, merge_func,
                  transition_func, cached=False, l2_reg=0.):
         self.labeledPoints = labeledPoints

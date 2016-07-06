@@ -2,15 +2,14 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-01-06 20:16:33
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-04-21 14:48:20
+# @Last Modified time: 2016-07-05 22:30:13
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
 
-from setuptools import Extension, setup
+from setuptools import Extension, setup, find_packages
 from sys import platform as _platform
 import os
-
 
 
 sources = [
@@ -29,8 +28,6 @@ flags = [
 # MAC OS X
 if _platform == "darwin":
     flags.append('-stdlib=libc++')
-# elif _platform in ('linux', 'linux2'):
-    # pass
 
 os.environ.setdefault('CC', 'g++')
 os.environ.setdefault('CXX', 'g++')
@@ -45,7 +42,21 @@ peregrine_extension = Extension(
     extra_link_args=link_flags
 )
 
-setup(
+META_DATA = dict(
     name = 'peregrine',
-    ext_modules = [peregrine_extension]
+    version = '0.0.1',
+    license = 'Apache-2',
+    author = 'Xiaocheng Tang',
+    author_email = 'xiaocheng.t@gmail.com',
+    ext_modules = [peregrine_extension],
+    packages = find_packages(),
+    install_requires = [
+        'sklearn',
+        'scipy',
+        'numpy',
+    ],
 )
+
+
+if __name__ == '__main__':
+    setup(**META_DATA)
