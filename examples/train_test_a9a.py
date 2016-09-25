@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2016-09-23 14:57:46
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-09-23 20:50:31
+# @Last Modified time: 2016-09-25 14:34:18
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -22,13 +22,13 @@ X_train, X_test, y_train, y_test = train_test_split(
 class LogregExecutor(object):
     """logistic regression using numpy"""
     def __init__(self, features, labels, fit_intercept = True):
-        if fit_intercept:
-            features = hstack((features, np.ones((features.shape[0], 1))))
         self.fit_intercept = fit_intercept
         self.features = features
         self.labels = labels
         self.n_samples = self.features.shape[0]
         self.n_features = self.features.shape[1]
+        if fit_intercept:
+            self.n_features += 1
 
     @property
     def n_variables(self):
@@ -39,7 +39,8 @@ class LogregExecutor(object):
         """evaluate objective value at w"""
         w = np.array(w, copy=False)
         X, Y = self.features, self.labels
-        self.e_ywx = np.exp(Y*X.dot(w))
+        wa, wb = (w[:-1], w[-1]) if self.fit_intercept else (w, 0)
+        self.e_ywx = np.exp(Y*(X.dot(wa) + wb))
         return np.average(np.log1p(1/self.e_ywx))
 
     def eval_grad(self, w, df):
@@ -48,7 +49,8 @@ class LogregExecutor(object):
         df = np.array(df, copy=False)
         X, Y, n = self.features, self.labels, self.n_samples
         a = -Y/(1+self.e_ywx)/n
-        np.copyto(df, X.transpose().dot(a))
+        db = [np.sum(a)] if self.fit_intercept else []
+        np.copyto(df, np.hstack([X.transpose().dot(a)] + db))
 
     def final(self, model):
         self._model = np.array(model, copy=True)
