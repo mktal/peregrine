@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 23:01:45
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-07-05 11:47:57
+# @Last Modified time: 2016-10-06 12:22:07
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -10,8 +10,21 @@
 
 from pyspark import SparkConf, SparkContext
 from sklearn.datasets import load_svmlight_file
+from sklearn.datasets import dump_svmlight_file
 from sklearn import datasets
 import numpy as np
+import os
+
+
+import errno
+def mkdir_p(path):
+  try:
+    os.makedirs(path)
+  except OSError as exc:  # Python >2.5
+    if exc.errno == errno.EEXIST and os.path.isdir(path):
+      pass
+    else:
+      raise
 
 
 class SparkController(object):
@@ -66,6 +79,37 @@ def load_mnist():
   return np.asarray(data.todense()), target
 
 
+def subsample_to_file(svm_file, out_dir, out_name, multilabel=False,
+                      row_ratio=0.5, col_ratio=0.3, random_state=12):
+  """
+  Example:
 
+  '''python
+     # run the following command in the current directory will create a
+     # `tmp` folder, if not already exists, and generate a file called
+     # `a9a_sub` from the original file `./data/a9a`. Both files are
+     # in libsvm format.
+     subsample_to_file("./data/a9a", "./tmp", "a9a_sub")
+     # read the subsampled file and make sure its number of rows is half of
+     # that of a9a and its number of column is roughly third of a9a (123)
+     X, y = load_svmlight_file('./tmp/a9a_sub')
+     assert X.shape == (16280, 36)
+  '''
 
+  """
+  X, y = load_svmlight_file(svm_file, multilabel=multilabel)
+  n, m = X.shape
+  subn = int(n*row_ratio)
+  subm = int(m*col_ratio)
+  assert subn > 0, ("row sample is {subn}! Increase row ratio {row_ratio}"
+                     .format(**locals()))
+  assert subm > 0, ("col sample is {subm}! Increase col ratio {col_ratio}"
+                     .format(**locals()))
+  rst = np.random.RandomState(random_state)
+  ridx = rst.choice(n, subn, replace=False)
+  cidx = rst.choice(m, subm, replace=False)
+  mkdir_p(out_dir)
+  out_file = os.path.join(out_dir, out_name)
+  dump_svmlight_file(X[ridx[:, np.newaxis], cidx], y[ridx],
+                     out_file, multilabel=multilabel)
 
