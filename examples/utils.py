@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Date:   2015-12-17 23:01:45
 # @Last Modified by:   Xiaocheng Tang
-# @Last Modified time: 2016-10-06 12:22:07
+# @Last Modified time: 2016-10-14 11:02:22
 #
 # Copyright (c) 2016 Xiaocheng Tang <xiaocheng.t@gmail.com>
 # All rights reserved.
@@ -97,19 +97,21 @@ def subsample_to_file(svm_file, out_dir, out_name, multilabel=False,
   '''
 
   """
+  assert 1 >= row_ratio > 0, \
+         "Row ratio {row_ratio} must be (0, 1]" \
+         .format(**locals())
+  assert 1 >= col_ratio > 0, \
+         "Col ratio {col_ratio} must be (0, 1]" \
+         .format(**locals())
   X, y = load_svmlight_file(svm_file, multilabel=multilabel)
   n, m = X.shape
   subn = int(n*row_ratio)
   subm = int(m*col_ratio)
-  assert subn > 0, ("row sample is {subn}! Increase row ratio {row_ratio}"
-                     .format(**locals()))
-  assert subm > 0, ("col sample is {subm}! Increase col ratio {col_ratio}"
-                     .format(**locals()))
   rst = np.random.RandomState(random_state)
   ridx = rst.choice(n, subn, replace=False)
   cidx = rst.choice(m, subm, replace=False)
   mkdir_p(out_dir)
   out_file = os.path.join(out_dir, out_name)
-  dump_svmlight_file(X[ridx[:, np.newaxis], cidx], y[ridx],
+  dump_svmlight_file(X[ridx,:][:,cidx], y[ridx],
                      out_file, multilabel=multilabel)
 
