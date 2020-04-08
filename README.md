@@ -1,6 +1,6 @@
 # Peregrine 
 ## A General Purpose Optimizer for Fast Machine Learning
-by Xiaocheng Tang [https://goo.gl/HUfuDT]
+by Xiaocheng Tang [https://mktal.github.io/]
 
 
 This code implements in C/C++ a fast second-order sparse training algorithm that is [shown](https://link.springer.com/article/10.1007/s10107-016-0997-3) to be order of magnitude faster than other first-order methods like (stochastic) gradient descent. 
@@ -19,4 +19,16 @@ cd peregrine/peregrine/examples && python single_node.py
 ```
 
 ## Citation
-* Katya Scheinberg and Xiaocheng Tang, _**Practical Inexact Proximal Quasi-Newton Method with Global Complexity Analysis**_, Mathematical Programming Series A, pages 1–35, 2016.  ([BibTex](https://goo.gl/plVvJp))
+* Katya Scheinberg and Xiaocheng Tang, _**Practical Inexact Proximal Quasi-Newton Method with Global Complexity Analysis**_, Mathematical Programming Series A, 160(1), 495–529., 2016. 
+
+```
+@article{Scheinberg:2016wj,
+  author = {Scheinberg, Katya and Tang, Xiaocheng},
+  title = {{Practical inexact proximal quasi-Newton method with global complexity analysis}},
+  journal = {Mathematical Programming},
+  year = {2016},
+  volume = {160},
+  number = {1},
+  pages = {495--529}
+}
+```
